@@ -20,19 +20,7 @@ repositories {
     mavenCentral()
 
     maven {
-        url = "https://maven.pkg.github.com/rubbaboy/Qilletni"
-        credentials {
-            username = System.getenv("GITHUB_ACTOR")
-            password = System.getenv("PACKAGE_PAT")
-        }
-    }
-
-    maven {
-        url = "https://maven.pkg.github.com/rubbaboy/QilletniDocgen"
-        credentials {
-            username = System.getenv("GITHUB_ACTOR")
-            password = System.getenv("PACKAGE_PAT")
-        }
+        url = 'https://central.sonatype.com/repository/maven-snapshots/'
     }
 }
 
@@ -44,6 +32,7 @@ dependencies {
     implementation 'dev.qilletni.impl:qilletni:1.0.0-SNAPSHOT:sources'
     
     implementation 'dev.qilletni.api:qilletni-api:1.0.0-SNAPSHOT'
+    implementation 'dev.qilletni.pkgutil:qilletni-pkgutil:1.0.0-SNAPSHOT'
     implementation 'dev.qilletni.docgen:qilletni-docgen:1.0.0-SNAPSHOT'
 
     // Configs

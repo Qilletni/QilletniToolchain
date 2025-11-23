@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 :: If the .jar file is in the same directory as this script:
-set "JAR_PATH=%~dp0QilletniToolchain-1.0.0-SNAPSHOT.jar"
+set "JAR_PATH=%~dp0QilletniToolchain.jar"
 
 :: Variables to hold Java system properties (-D*) and other args
 set "JAVA_OPTS="

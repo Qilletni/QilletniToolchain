@@ -13,6 +13,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -73,30 +74,44 @@ public class QilletniInfoParser {
         
         var version = Version.parseVersionString((String) Objects.requireNonNull(obj.get("version"), "'version' required in qilletni_info"))
                 .orElseThrow(() -> new InvalidVersionException("Invalid version"));
-        
+
         var sourceUrl = (String) obj.getOrDefault("source_url", "");
 
         var providerClass = (String) obj.getOrDefault("provider", null);
         var nativeBindFactoryClass = (String) obj.getOrDefault("native_bind_factory", null);
+        var musicStrategies = (String) obj.getOrDefault("music_strategies", null);
         var nativeClasses = (List<String>) obj.getOrDefault("native_classes", Collections.emptyList());
         var autoImportFiles = (List<String>) obj.getOrDefault("auto_import", Collections.emptyList());
-        var dependencies = (List<String>) Objects.requireNonNullElse(obj.get("dependencies"), Collections.emptyList());
+        var dependencies = Objects.requireNonNullElse(obj.get("dependencies"), null);
 
-        var dependencyList = dependencies.stream().map(dependencyString -> {
-            var dependencySplit = dependencyString.split(":");
-            
-            if (dependencySplit.length != 2) {
-                throw new QilletniInfoFormatException("Dependencies require a name and a version");
-            }
-            
-            var dependencyName = dependencySplit[0];
-            var dependencyVersion = ComparableVersion.parseComparableVersionString(dependencySplit[1])
-                    .orElseThrow(() -> new QilletniInfoFormatException("Invalid version for dependency " + dependencyName));
-            
-            return new QilletniInfoData.Dependency(dependencyName, dependencyVersion);
-        }).toList();
+        List<QilletniInfoData.Dependency> dependencyList = new ArrayList<>();
+
+        if (dependencies instanceof Map depMap) {
+            Map<String, String> dependenciesMap = (Map<String, String>) depMap;
+            dependencyList = dependenciesMap.entrySet().stream().map(entry -> {
+                var packageName = entry.getKey().startsWith("@") ? entry.getKey().substring(1) : entry.getKey();
+
+                var dependencyVersion = ComparableVersion.parseComparableVersionString(entry.getValue())
+                        .orElseThrow(() -> new QilletniInfoFormatException("Invalid version for dependency " + packageName));
+
+                return new QilletniInfoData.Dependency(packageName, dependencyVersion);
+            }).toList();
+        }
+
+        var nameScope = parsePackageName(nameString);
         
-        return new QilletniInfoData(nameString, version, authorString, description, sourceUrl, providerClass, nativeBindFactoryClass, nativeClasses, autoImportFiles, dependencyList);
+        return new QilletniInfoData(nameScope.scope, nameScope.name, version, authorString, description, sourceUrl, providerClass, nativeBindFactoryClass, musicStrategies, nativeClasses, autoImportFiles, dependencyList);
     }
-    
+
+    record PackageName(String scope, String name) {}
+
+    public static PackageName parsePackageName(String fullName) {
+        var splitName = fullName.split("/");
+
+        if (splitName.length != 2) {
+            return new PackageName("", splitName[1]);
+        }
+
+        return new PackageName(splitName[0], splitName[1]);
+    }
 }
