@@ -30,7 +30,10 @@ public class CommandRun implements Callable<Integer> {
     
     @CommandLine.Option(names = {"--dependency-path", "-d"}, description = "The directory that holds all dependencies")
     public Path dependencyPath;
-    
+
+    @CommandLine.Option(names = {"--lockfile", "-k"}, defaultValue = "qilletni.lock", description = "The path to the qilletni.lock file")
+    public Path lockfilePath;
+
     @CommandLine.Option(names = {"-h", "--help"}, usageHelp = true, description = "Display a help message")
     private boolean helpRequested = false;
 
@@ -60,7 +63,13 @@ public class CommandRun implements Callable<Integer> {
             LOGGER.error("Qilletni input file {} does not exist!", file.toAbsolutePath());
             return 1;
         }
-        
+
+        var useLockfile = true;
+        if (Files.notExists(lockfilePath)) {
+            LOGGER.warn("qilletni.lock not found, no libraries will be used");
+            useLockfile = false;
+        }
+
         if (dependencyPath == null) {
             dependencyPath = PathUtility.getDependencyPath();
         }
@@ -100,38 +109,43 @@ public class CommandRun implements Callable<Integer> {
                     }
                 }
             }
+
+            // TODO: Test local libraries with dependencies
         }
 
         var localLibraryName = localLibraryQll != null ? localLibraryQll.name() : null;
 
-        try (var deps = Files.list(dependencyPath)) {
-            deps.filter(path -> path.getFileName().toString().endsWith(".qll"))
-                    .forEach(path -> {
-                        qllJarExtractor.extractJarTo(path, tempRunDir);
+        if (useLockfile) {
+            try {
+                qllLoader.getResolvedPackages(lockfilePath)
+                        .stream().map(resolvedPackage -> dependencyPath.resolve(resolvedPackage.resolved() + ".qll"))
+                        .forEach(path -> {
+                            // TODO: Improve jar extraction
+                            qllJarExtractor.extractJarTo(path, tempRunDir);
 
-                        try {
-                            var loadedQll = qllLoader.loadQll(librarySourceFileResolver, path);
+                            try {
+                                var loadedQll = qllLoader.loadQll(librarySourceFileResolver, path);
 
-                            if (loadedQll.name().equals(localLibraryName)) {
-                                LOGGER.debug("Skipping loading local library {} from dependencies", localLibraryName);
-                                return;
+                                if (loadedQll.name().equals(localLibraryName)) {
+                                    LOGGER.debug("Skipping loading local library {} from dependencies", localLibraryName);
+                                    return;
+                                }
+
+                                loadedLibraries.add(loadedQll);
+                            } catch (IOException | URISyntaxException e) {
+                                throw new RuntimeException(e);
                             }
-
-                            loadedLibraries.add(loadedQll);
-                        } catch (IOException | URISyntaxException e) {
-                            throw new RuntimeException(e);
-                        }
-                    });
-
-        } catch (IOException e) {
-            LOGGER.error("An exception occurred while reading dependencies", e);
+                });
+            } catch (IOException e) {
+                LOGGER.error("An exception occurred while reading dependencies", e);
+            }
         }
 
         var qllJarClassLoader = qllJarExtractor.createClassLoader();
 
         var libraryValidator = new LibraryValidator(loadedLibraries);
         if (!libraryValidator.validate()) {
-            LOGGER.error("Exiting due to unmet dependencies");
+            LOGGER.error("Exiting due to unmet dependencies. Try deleting qilletni.lock and re-installing dependencies");
             return 1;
         }
 

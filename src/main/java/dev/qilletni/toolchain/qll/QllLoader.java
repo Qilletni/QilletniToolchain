@@ -2,6 +2,8 @@ package dev.qilletni.toolchain.qll;
 
 import dev.qilletni.api.lib.qll.QllInfo;
 import dev.qilletni.impl.lib.LibrarySourceFileResolver;
+import dev.qilletni.pkgutil.manifest.LockFile;
+import dev.qilletni.pkgutil.manifest.models.ResolvedPackage;
 import dev.qilletni.toolchain.config.QilletniInfoParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,8 +14,10 @@ import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.function.Predicate;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -148,5 +152,10 @@ public class QllLoader {
                 }));
 
         return qllInfo;
+    }
+
+    public List<ResolvedPackage> getResolvedPackages(Path lockfilePath) throws IOException {
+        var parse = LockFile.parse(lockfilePath);
+        return new ArrayList<>(parse.getPackages().values());
     }
 }

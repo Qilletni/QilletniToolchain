@@ -1,5 +1,6 @@
 package dev.qilletni.toolchain.init;
 
+import dev.qilletni.toolchain.qll.QPMUtility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,9 +32,19 @@ public class ProjectInit {
                 name: %s
                 version: 1.0.0
                 author: %s%s
+                dependencies:
+                    qilletni/std: ^1.0.0
                 """.formatted(projectName, authorName, nativeInit == null ? "" : "\n" + nativeInit.getNativeClassesList());
         
         Files.writeString(qilletniSrc.resolve("qilletni_info.yml"), yml);
+
+        var gitignore = """
+                .gradle
+                build/
+                out/
+                """;
+
+        Files.writeString(sourcePath.resolve(".gitignore"), gitignore);
 
         if (projectTypeEnum == ProjectType.LIBRARY) {
             var qilletniExamples = sourcePath.resolve("examples");
@@ -53,6 +64,17 @@ public class ProjectInit {
             LOGGER.debug("Creating Gradle project...");
             var gradleProjectInitializer = new GradleProjectInitializer(sourcePath, sourcePath.getFileName().toString(), nativeInit.packageName, nativeInit.className, GRADLE_VERSION);
             gradleProjectInitializer.initializeProject();
+        }
+
+        if (QPMUtility.isQPMInstalled()) {
+            LOGGER.debug("Running `qpm install`...");
+
+            var processResult = QPMUtility.runQPMInstall(true, qilletniSrc);
+            if (!processResult.isSuccessful()) {
+                LOGGER.error("Unable to install dependencies: {}", processResult.stdErr());
+            }
+        } else {
+            LOGGER.error("qpm is not installed, unable to install packages");
         }
     }
     

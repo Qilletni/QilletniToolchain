@@ -82,7 +82,7 @@ public class QilletniInfoParser {
         var musicStrategies = (String) obj.getOrDefault("music_strategies", null);
         var nativeClasses = (List<String>) obj.getOrDefault("native_classes", Collections.emptyList());
         var autoImportFiles = (List<String>) obj.getOrDefault("auto_import", Collections.emptyList());
-        var dependencies = Objects.requireNonNullElse(obj.get("dependencies"), null);
+        var dependencies = obj.getOrDefault("dependencies", null);
 
         List<QilletniInfoData.Dependency> dependencyList = new ArrayList<>();
 
@@ -109,7 +109,7 @@ public class QilletniInfoParser {
         var splitName = fullName.split("/");
 
         if (splitName.length != 2) {
-            return new PackageName("", splitName[1]);
+            return new PackageName("", splitName[0]);
         }
 
         return new PackageName(splitName[0], splitName[1]);
