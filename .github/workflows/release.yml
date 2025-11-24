@@ -12,22 +12,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '22'
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Build Project
         run: ./gradlew clean shadowJar
-        env:
-          PACKAGE_PAT: ${{ secrets.PACKAGE_PAT }}
 
       - name: Get Gradle Version
         id: get_version
@@ -36,63 +33,11 @@ jobs:
           echo "Gradle version is: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Docker Metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ vars.PUBLISH_CONTAINER_URL }} # ghcr.io/RubbaBoy/Qilletni
-          tags: |
-            type=raw,value=v${{ steps.get_version.outputs.version }}
-            # Tag as 'latest' only for workflow_dispatch events (manual releases)
-            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
-            # Add a tag for push events if push trigger is re-enabled
-            type=sha,prefix=prerelease-,enable=${{ github.event_name == 'push' }}
-
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Set Release Variables
-        id: set_release
-        shell: bash
-        run: |
-          # This logic is now less critical if Docker 'latest' is tied to workflow_dispatch
-          # but we keep it for the GH Release artifact tagging/prerelease flag
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            echo "Detected push event – creating pre-release."
-            # Use a different tag scheme for push if needed, e.g., including commit SHA or run number
-            RELEASE_TAG="v${{ steps.get_version.outputs.version }}-${{ github.sha }}"
-            PRERELEASE="true"
-          else # workflow_dispatch
-            echo "Detected manual trigger – creating official release."
-            RELEASE_TAG="v${{ steps.get_version.outputs.version }}"
-            PRERELEASE="false"
-          fi
-          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_OUTPUT
-          echo "PRERELEASE=$PRERELEASE" >> $GITHUB_OUTPUT
-          echo "Release tag will be: $RELEASE_TAG and prerelease is: $PRERELEASE"
-          echo "Docker image tags will be: ${{ steps.meta.outputs.tags }}"
-
       - name: Package Release Asset
         run: |
           tar -czvf qilletni-${{ steps.get_version.outputs.version }}.tar.gz \
+            --transform 's|^scripts/|bin/|' \
+            --transform 's|^build/libs/||' \
             build/libs/QilletniToolchain.jar \
             scripts/qilletni.bat \
             scripts/qilletni
