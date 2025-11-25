@@ -11,7 +11,7 @@ permissions:
   contents: write # Needed for GitHub Releases
 
 jobs:
-  build-and-release:
+  publish-release:
     runs-on: ubuntu-latest
     if: github.repository == 'Qilletni/QilletniToolchain'
     steps:

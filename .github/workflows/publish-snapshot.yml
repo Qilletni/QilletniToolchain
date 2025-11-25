@@ -44,7 +44,7 @@ jobs:
 
       - name: Package Release Asset
         run: |
-          tar -czvf qpm-${{ steps.get_version.outputs.version }}.tar.gz \
+          tar -czvf qilletni-${{ steps.get_version.outputs.version }}.tar.gz \
             --transform 's|^scripts/|bin/|' \
             --transform 's|^build/libs/||' \
             build/libs/QilletniToolchain.jar \
