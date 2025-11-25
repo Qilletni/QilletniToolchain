@@ -13,7 +13,7 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-    if: github.repository == 'Qilletni/QPMCLI'
+    if: github.repository == 'Qilletni/QilletniToolchain'
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6

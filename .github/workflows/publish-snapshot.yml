@@ -13,7 +13,7 @@ permissions:
 jobs:
   publish-snapshot:
     runs-on: ubuntu-latest
-    if: github.repository == 'Qilletni/QPMCLI'
+    if: github.repository == 'Qilletni/QilletniToolchain'
     steps:
       - uses: actions/checkout@v6
 
