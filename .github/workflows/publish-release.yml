@@ -66,11 +66,12 @@ jobs:
           release_notes_file: RELEASE_NOTES.md
           prerelease: false
 
-      - name: Create final release
-        run: |
-          gh release create "${{ steps.get_version.outputs.version }}" \
-            --notes-file RELEASE_NOTES.md \
-            qilletni-${{ steps.get_version.outputs.version }}.tar.gz \
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          prerelease: false
+          body_path: RELEASE_NOTES.md
+          files: |
+            qilletni-${{ steps.get_version.outputs.version }}.tar.gz
             build/libs/QilletniToolchain.jar
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
