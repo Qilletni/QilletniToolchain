@@ -28,7 +28,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Build Project
-        run: ./gradlew clean shadowJar
+        run: ./gradlew :shadowJar
 
       - name: Check version is release
         id: get_version

@@ -26,6 +26,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
+      - name: Build Project
+        run: ./gradlew :shadowJar
+
       - name: Check version is SNAPSHOT
         id: get_version
         run: |
