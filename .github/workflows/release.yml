@@ -1,0 +1,153 @@
+name: Publish
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    if: github.repository == 'Qilletni/QilletniToolchain'
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      is_snapshot: ${{ steps.get_version.outputs.is_snapshot }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          java-version: '22'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Get and validate version
+        id: get_version
+        run: |
+          GRADLE_VERSION=$(./gradlew :properties -q | grep "^version:" | awk '{print $2}')
+          echo "version=$GRADLE_VERSION" >> $GITHUB_OUTPUT
+
+          if [[ "$GRADLE_VERSION" =~ -SNAPSHOT$ ]]; then
+            # SNAPSHOT: only allow from branch push, not tag push
+            if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+              echo "Error: Tagged release but version $GRADLE_VERSION is a SNAPSHOT"
+              exit 1
+            fi
+            echo "is_snapshot=true" >> $GITHUB_OUTPUT
+            echo "Confirmed SNAPSHOT version: $GRADLE_VERSION"
+          else
+            # Release: must be from tag push and versions must match
+            if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+              echo "Error: Non-SNAPSHOT version $GRADLE_VERSION requires a tag"
+              exit 1
+            fi
+          
+            TAG=${GITHUB_REF#refs/tags/}
+            TAG_VERSION=${TAG#v}
+          
+            if [[ "$GRADLE_VERSION" != "$TAG_VERSION" ]]; then
+              echo "Error: Gradle version $GRADLE_VERSION does not match tag $TAG (expected $TAG_VERSION)"
+              exit 1
+            fi
+          
+            echo "is_snapshot=false" >> $GITHUB_OUTPUT
+            echo "Confirmed release version: $GRADLE_VERSION"
+          fi
+
+  build-artifacts:
+    runs-on: ubuntu-latest
+    needs: check-version
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          java-version: '22'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Build Project
+        run: ./gradlew shadowJar
+
+      - name: Package Release Asset
+        run: |
+          tar -czvf qilletni-${{ needs.check-version.outputs.version }}.tar.gz \
+            --transform 's|^scripts/|bin/|' \
+            --transform 's|^build/libs/||' \
+            build/libs/QilletniToolchain.jar \
+            scripts/qilletni.bat \
+            scripts/qilletni
+
+      - name: Extract release notes
+        uses: ffurrer2/extract-release-notes@v2
+        with:
+          changelog_file: CHANGELOG.md
+          release_notes_file: RELEASE_NOTES.md
+          prerelease: ${{ needs.check-version.outputs.is_snapshot }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: release-artifacts
+          path: |
+            qilletni-${{ needs.check-version.outputs.version }}.tar.gz
+            build/libs/QilletniToolchain.jar
+            RELEASE_NOTES.md
+
+  publish-snapshot:
+    runs-on: ubuntu-latest
+    needs: [check-version, build-artifacts]
+    if: needs.check-version.outputs.is_snapshot == 'true'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: release-artifacts
+
+      - name: Update snapshot tag
+        run: |
+          git tag -f snapshot
+          git push origin --force refs/tags/snapshot
+
+      - name: Create snapshot release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: snapshot
+          name: ${{ needs.check-version.outputs.version }}
+          prerelease: true
+          body_path: RELEASE_NOTES.md
+          files: |
+            qilletni-${{ needs.check-version.outputs.version }}.tar.gz
+            build/libs/QilletniToolchain.jar
+
+  publish-release:
+    runs-on: ubuntu-latest
+    needs: [check-version, build-artifacts]
+    if: needs.check-version.outputs.is_snapshot == 'false'
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: release-artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.check-version.outputs.version }}
+          name: v${{ needs.check-version.outputs.version }}
+          prerelease: false
+          body_path: RELEASE_NOTES.md
+          files: |
+            qilletni-${{ needs.check-version.outputs.version }}.tar.gz
+            build/libs/QilletniToolchain.jar
