@@ -1,0 +1,65 @@
+name: Publish SNAPSHOT
+
+on:
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - '*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish-snapshot:
+    runs-on: ubuntu-latest
+    if: github.repository == 'Qilletni/QPMCLI'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: '22'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Check version is SNAPSHOT
+        id: get_version
+        run: |
+          GRADLE_VERSION=$(./gradlew :properties -q | grep "^version:" | awk '{print $2}')
+
+          if [[ ! "$GRADLE_VERSION" =~ -SNAPSHOT$ ]]; then
+            echo "Error: Version $GRADLE_VERSION is not a SNAPSHOT. Refusing to publish."
+            exit 1
+          fi
+
+          echo "Confirmed SNAPSHOT version: $GRADLE_VERSION"
+          echo "version=$GRADLE_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Package Release Asset
+        run: |
+          tar -czvf qpm-${{ steps.get_version.outputs.version }}.tar.gz \
+            --transform 's|^scripts/|bin/|' \
+            --transform 's|^build/libs/||' \
+            build/libs/QilletniToolchain.jar \
+            scripts/qilletni.bat \
+            scripts/qilletni
+
+      - name: Extract release notes
+        uses: ffurrer2/extract-release-notes@v2
+        with:
+          changelog_file: CHANGELOG.md
+          release_notes_file: RELEASE_NOTES.md
+          prerelease: true
+
+      - name: Create snapshot release
+        run: |
+          gh release create "${{ steps.get_version.outputs.version }}" \
+            --notes-file RELEASE_NOTES.md \
+            qilletni-${{ steps.get_version.outputs.version }}.tar.gz \
+            build/libs/QilletniToolchain.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

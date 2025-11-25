@@ -1,0 +1,76 @@
+name: Publish Release
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '*.*.*'
+
+permissions:
+  contents: write # Needed for GitHub Releases
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    if: github.repository == 'Qilletni/QPMCLI'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          java-version: '22'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Build Project
+        run: ./gradlew clean shadowJar
+
+      - name: Check version is release
+        id: get_version
+        run: |
+          GRADLE_VERSION=$(./gradlew :properties -q | grep "^version:" | awk '{print $2}')
+          TAG=${GITHUB_REF#refs/tags/}
+          TAG_VERSION=${TAG#v}
+
+          if [[ "$GRADLE_VERSION" =~ -SNAPSHOT$ ]]; then
+            echo "Error: Version $GRADLE_VERSION is a SNAPSHOT. Refusing to publish."
+            exit 1
+          fi
+          
+          if [[ "$GRADLE_VERSION" != "$TAG_VERSION" ]]; then
+            echo "Error: Gradle version $GRADLE_VERSION does not match tag $TAG (expected $TAG_VERSION)"
+            exit 1
+          fi
+
+          echo "Confirmed release version: $GRADLE_VERSION"
+          echo "version=$GRADLE_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Package Release Asset
+        run: |
+          tar -czvf qilletni-${{ steps.get_version.outputs.version }}.tar.gz \
+            --transform 's|^scripts/|bin/|' \
+            --transform 's|^build/libs/||' \
+            build/libs/QilletniToolchain.jar \
+            scripts/qilletni.bat \
+            scripts/qilletni
+
+      - name: Extract release notes
+        uses: ffurrer2/extract-release-notes@v2
+        with:
+          changelog_file: CHANGELOG.md
+          release_notes_file: RELEASE_NOTES.md
+          prerelease: false
+
+      - name: Create final release
+        run: |
+          gh release create "${{ steps.get_version.outputs.version }}" \
+            --notes-file RELEASE_NOTES.md \
+            qilletni-${{ steps.get_version.outputs.version }}.tar.gz \
+            build/libs/QilletniToolchain.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
