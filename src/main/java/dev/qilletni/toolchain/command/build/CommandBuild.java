@@ -110,9 +110,9 @@ public class CommandBuild implements Callable<Integer> {
                 destinationFile = outputFilePath.resolve(defaultQllFileName);
             }
         } else {
-            var outDir = projectRoot.resolve("out");
+            var outDir = projectRoot.resolve("build").resolve("ql-build");
             Files.createDirectories(outDir);
-            destinationFile = outDir.resolve(defaultQllFileName);;
+            destinationFile = outDir.resolve(defaultQllFileName);
         }
 
         LOGGER.debug("Writing package to: {}", destinationFile);
