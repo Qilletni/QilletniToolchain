@@ -81,8 +81,7 @@ jobs:
       - name: Package Release Asset
         run: |
           tar -czvf qilletni-${{ needs.check-version.outputs.version }}.tar.gz \
-            --transform 's|^scripts/|bin/|' \
-            --transform 's|^build/libs/||' \
+            --transform 's|.*/||' \
             build/libs/QilletniToolchain.jar \
             scripts/qilletni.bat \
             scripts/qilletni
