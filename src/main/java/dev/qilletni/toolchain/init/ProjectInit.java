@@ -22,11 +22,16 @@ public class ProjectInit {
      * @param nativeInit
      * @param projectTypeEnum
      */
-    public void initialize(Path sourcePath, String projectName, String authorName, NativeInit nativeInit, ProjectType projectTypeEnum) throws IOException, URISyntaxException {
+    public void initialize(Path sourcePath, String projectName, String scope, String authorName, NativeInit nativeInit, ProjectType projectTypeEnum) throws IOException, URISyntaxException {
         Files.createDirectories(sourcePath);
         
         var qilletniSrc = sourcePath.resolve("qilletni-src");
         Files.createDirectories(qilletniSrc);
+
+        var scopedProjectName = projectName;
+        if (scope != null) {
+            scopedProjectName = "%s/%s".formatted(scope, projectName);
+        }
         
         var yml = """
                 name: %s
@@ -34,14 +39,13 @@ public class ProjectInit {
                 author: %s%s
                 dependencies:
                     qilletni/std: ^1.0.0
-                """.formatted(projectName, authorName, nativeInit == null ? "" : "\n" + nativeInit.getNativeClassesList());
+                """.formatted(scopedProjectName, authorName, nativeInit == null ? "" : "\n" + nativeInit.getNativeClassesList());
         
         Files.writeString(qilletniSrc.resolve("qilletni_info.yml"), yml);
 
         var gitignore = """
                 .gradle
                 build/
-                out/
                 """;
 
         Files.writeString(sourcePath.resolve(".gitignore"), gitignore);

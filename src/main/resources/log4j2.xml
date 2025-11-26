@@ -35,10 +35,13 @@
         <Logger name="dev.qilletni.lib.spotify" level="${sys:QL_LOG_LEVEL:-INFO}" additivity="false">
             <AppenderRef ref="ConsoleOut"/>
         </Logger>
+        <Logger name="dev.qilletni.lib.tidal" level="${sys:QL_LOG_LEVEL:-INFO}" additivity="false">
+            <AppenderRef ref="ConsoleOut"/>
+        </Logger>
         <Logger name="dev.qilletni.lib.core" level="${sys:QL_LOG_LEVEL:-INFO}" additivity="false">
             <AppenderRef ref="ConsoleOut"/>
         </Logger>
-        <Logger name="dev.qilletni.toolchain" level="${sys:TOOLCHAIN_LOG_LEVEL:-DEBUG}" additivity="false">
+        <Logger name="dev.qilletni.toolchain" level="${sys:TOOLCHAIN_LOG_LEVEL:-INFO}" additivity="false">
             <AppenderRef ref="ConsoleOut"/>
         </Logger>
         <Logger name="dev.qilletni.docgen" level="${sys:DOCGEN_LOG_LEVEL:-INFO}" additivity="false">
