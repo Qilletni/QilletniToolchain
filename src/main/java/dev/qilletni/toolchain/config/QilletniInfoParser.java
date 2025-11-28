@@ -79,7 +79,6 @@ public class QilletniInfoParser {
 
         var providerClass = (String) obj.getOrDefault("provider", null);
         var nativeBindFactoryClass = (String) obj.getOrDefault("native_bind_factory", null);
-        var musicStrategies = (String) obj.getOrDefault("music_strategies", null);
         var nativeClasses = (List<String>) obj.getOrDefault("native_classes", Collections.emptyList());
         var autoImportFiles = (List<String>) obj.getOrDefault("auto_import", Collections.emptyList());
         var dependencies = obj.getOrDefault("dependencies", null);
@@ -100,7 +99,7 @@ public class QilletniInfoParser {
 
         var nameScope = parsePackageName(nameString);
         
-        return new QilletniInfoData(nameScope.scope, nameScope.name, version, authorString, description, sourceUrl, providerClass, nativeBindFactoryClass, musicStrategies, nativeClasses, autoImportFiles, dependencyList);
+        return new QilletniInfoData(nameScope.scope, nameScope.name, version, authorString, description, sourceUrl, providerClass, nativeBindFactoryClass, nativeClasses, autoImportFiles, dependencyList);
     }
 
     record PackageName(String scope, String name) {}
