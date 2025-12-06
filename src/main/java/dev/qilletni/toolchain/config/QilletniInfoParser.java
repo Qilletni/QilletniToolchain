@@ -93,18 +93,20 @@ public class QilletniInfoParser {
                 var dependencyVersion = ComparableVersion.parseComparableVersionString(entry.getValue())
                         .orElseThrow(() -> new QilletniInfoFormatException("Invalid version for dependency " + packageName));
 
-                return new QilletniInfoData.Dependency(packageName, dependencyVersion);
+                var nameScope = parsePackageName(packageName);
+
+                return new QilletniInfoData.Dependency(nameScope.scope, nameScope.name, dependencyVersion);
             }).toList();
         }
 
         var nameScope = parsePackageName(nameString);
-        
+
         return new QilletniInfoData(nameScope.scope, nameScope.name, version, authorString, description, sourceUrl, providerClass, nativeBindFactoryClass, nativeClasses, autoImportFiles, dependencyList);
     }
 
     record PackageName(String scope, String name) {}
 
-    public static PackageName parsePackageName(String fullName) {
+    private static PackageName parsePackageName(String fullName) {
         var splitName = fullName.split("/");
 
         if (splitName.length != 2) {

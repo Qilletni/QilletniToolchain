@@ -1,6 +1,7 @@
 package dev.qilletni.toolchain.qll;
 
 import dev.qilletni.api.lib.qll.QllInfo;
+import dev.qilletni.pkgutil.manifest.models.ResolvedPackage;
 
 import java.io.IOException;
 import java.net.URL;
@@ -19,11 +20,12 @@ public class QllJarExtractor {
      * Takes a .qll and extracts the jar, preparing it for class loading. The jar file will be named the .qll name,\
      * with the .qll extension replaced with .jar
      *
-     * @param qllPath The path of the .qll library
+     * @param resolvedPackage The package the jar belongs to
+     * @param qllPath         The path of the .qll library
      * @param destinationPath The directory to place the .jar file in
      */
-    public void extractJarTo(Path qllPath, Path destinationPath) {
-        var destinationFile = destinationPath.resolve(createJarName(qllPath.getFileName().toString()));
+    public void extractJarTo(ResolvedPackage resolvedPackage, Path qllPath, Path destinationPath) {
+        var destinationFile = destinationPath.resolve("%s-%s.jar".formatted(resolvedPackage.name().replace('/', '_'), resolvedPackage.version()));
         
         try (var fileSystem = FileSystems.newFileSystem(qllPath)) {
             var path = fileSystem.getPath("native.jar");

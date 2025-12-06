@@ -94,7 +94,7 @@ public class GradleProjectHelper {
                         System.out.println(str);
                     }
                     
-                    stdOut.append(str);
+                    stdOut.append(str).append('\n');
                 });
             }
 
@@ -104,17 +104,17 @@ public class GradleProjectHelper {
                         System.err.println(str);
                     }
 
-                    stdErr.append(str);
+                    stdErr.append(str).append('\n');
                 });
             }
 
             boolean completed = process.waitFor(1, TimeUnit.MINUTES);
             if (!completed) {
                 process.destroyForcibly();
-                return new ProcessResult(-1, "Process timed out after 1 minute", stdErr.toString());
+                return new ProcessResult(-1, "Process timed out after 1 minute", stdErr.toString().trim());
             }
 
-            return new ProcessResult(process.exitValue(), stdOut.toString(), stdErr.toString());
+            return new ProcessResult(process.exitValue(), stdOut.toString().trim(), stdErr.toString().trim());
 
         } catch (IOException | InterruptedException e) {
             LOGGER.error("Error while running Gradle task: {}", task, e);

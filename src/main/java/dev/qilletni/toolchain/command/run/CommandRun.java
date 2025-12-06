@@ -5,6 +5,7 @@ import dev.qilletni.api.lib.qll.QllInfo;
 import dev.qilletni.impl.ServiceManager;
 import dev.qilletni.impl.lang.runner.QilletniProgramRunner;
 import dev.qilletni.impl.lib.LibrarySourceFileResolver;
+import dev.qilletni.pkgutil.manifest.ManifestFinder;
 import dev.qilletni.toolchain.LogSetup;
 import dev.qilletni.toolchain.PathUtility;
 import dev.qilletni.toolchain.qll.GradleProjectHelper;
@@ -31,7 +32,7 @@ public class CommandRun implements Callable<Integer> {
     @CommandLine.Option(names = {"--dependency-path", "-d"}, description = "The directory that holds all dependencies")
     public Path dependencyPath;
 
-    @CommandLine.Option(names = {"--lockfile", "-k"}, defaultValue = "qilletni.lock", description = "The path to the qilletni.lock file")
+    @CommandLine.Option(names = {"--lockfile", "-k"}, description = "The path to the qilletni.lock file")
     public Path lockfilePath;
 
     @CommandLine.Option(names = {"-h", "--help"}, usageHelp = true, description = "Display a help message")
@@ -65,6 +66,10 @@ public class CommandRun implements Callable<Integer> {
         }
 
         var useLockfile = true;
+        if (lockfilePath == null) {
+            lockfilePath = ManifestFinder.getLockfile();
+        }
+
         if (Files.notExists(lockfilePath)) {
             LOGGER.warn("qilletni.lock not found, no libraries will be used");
             useLockfile = false;
@@ -118,13 +123,14 @@ public class CommandRun implements Callable<Integer> {
         if (useLockfile) {
             try {
                 qllLoader.getResolvedPackages(lockfilePath)
-                        .stream().map(resolvedPackage -> dependencyPath.resolve(resolvedPackage.resolved() + ".qll"))
-                        .forEach(path -> {
+                        .forEach(resolvedPackage -> {
+                            var qllPath = dependencyPath.resolve(resolvedPackage.resolved() + ".qll");
+
                             // TODO: Improve jar extraction
-                            qllJarExtractor.extractJarTo(path, tempRunDir);
+                            qllJarExtractor.extractJarTo(resolvedPackage, qllPath, tempRunDir);
 
                             try {
-                                var loadedQll = qllLoader.loadQll(librarySourceFileResolver, path);
+                                var loadedQll = qllLoader.loadQll(librarySourceFileResolver, qllPath);
 
                                 if (loadedQll.name().equals(localLibraryName)) {
                                     LOGGER.debug("Skipping loading local library {} from dependencies", localLibraryName);
