@@ -1,10 +1,10 @@
 package dev.qilletni.toolchain;
 
-import dev.qilletni.toolchain.command.build.CommandBuild;
-import dev.qilletni.toolchain.command.doc.CommandDoc;
-import dev.qilletni.toolchain.command.init.CommandInit;
-import dev.qilletni.toolchain.command.persist.CommandPersist;
-import dev.qilletni.toolchain.command.run.CommandRun;
+import dev.qilletni.toolchain.command.CommandBuild;
+import dev.qilletni.toolchain.command.CommandDoc;
+import dev.qilletni.toolchain.command.CommandInit;
+import dev.qilletni.toolchain.command.CommandPersist;
+import dev.qilletni.toolchain.command.CommandRun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;

@@ -1,4 +1,4 @@
-package dev.qilletni.toolchain.command.run;
+package dev.qilletni.toolchain.command;
 
 import dev.qilletni.api.exceptions.QilletniException;
 import dev.qilletni.api.lib.qll.QllInfo;

@@ -1,4 +1,4 @@
-package dev.qilletni.toolchain.command.init;
+package dev.qilletni.toolchain.command;
 
 import dev.qilletni.toolchain.init.ProjectInit;
 import dev.qilletni.toolchain.init.ProjectType;

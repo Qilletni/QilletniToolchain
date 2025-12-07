@@ -1,4 +1,4 @@
-package dev.qilletni.toolchain.command.persist;
+package dev.qilletni.toolchain.command;
 
 import dev.qilletni.api.lib.persistence.PackageConfig;
 import dev.qilletni.impl.lib.persistence.PackageConfigImpl;

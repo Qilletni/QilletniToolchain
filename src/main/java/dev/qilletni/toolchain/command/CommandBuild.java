@@ -1,9 +1,8 @@
-package dev.qilletni.toolchain.command.build;
+package dev.qilletni.toolchain.command;
 
 import dev.qilletni.api.lib.qll.QllInfo;
 import dev.qilletni.toolchain.FileUtil;
 import dev.qilletni.toolchain.LogSetup;
-import dev.qilletni.toolchain.PathUtility;
 import dev.qilletni.toolchain.config.QilletniInfoParser;
 import dev.qilletni.toolchain.qll.GradleProjectHelper;
 import dev.qilletni.toolchain.qll.QilletniSourceHandler;

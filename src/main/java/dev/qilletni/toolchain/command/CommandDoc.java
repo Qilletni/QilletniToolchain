@@ -1,4 +1,4 @@
-package dev.qilletni.toolchain.command.doc;
+package dev.qilletni.toolchain.command;
 
 import dev.qilletni.toolchain.PathUtility;
 import dev.qilletni.toolchain.config.QilletniInfoParser;
