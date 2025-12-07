@@ -32,11 +32,10 @@ public class QllLoader {
         QllInfo qllInfo;
 
         var zipUri = URI.create("jar:" + qllPath.toUri());
-        var qllInfoGenerator = new QllInfoGenerator();
 
         try (var zipFile = new ZipFile(qllPath.toFile());
              var zipFs = FileSystems.newFileSystem(zipUri, Collections.emptyMap())) {
-            qllInfo = qllInfoGenerator.readQllInfo(zipFile.getInputStream(zipFile.getEntry("qll.info")));
+            qllInfo = QllInfoGenerator.readPackagedQllInfo(zipFile.getInputStream(zipFile.getEntry("qll.info")));
 
             LOGGER.debug("qllInfo = {}", qllInfo);
 

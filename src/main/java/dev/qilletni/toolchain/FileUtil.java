@@ -4,18 +4,17 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 
 public class FileUtil {
 
-    public static void deleteDirectory(Path file) {
+    public static void deleteDirectory(Path path) {
         try {
-            if (Files.isDirectory(file)) {
-                try (var contents = Files.list(file)) {
-                    contents.forEach(FileUtil::deleteDirectory);
-                }
+            try (var stream = Files.walk(path)) {
+                stream.sorted(Comparator.reverseOrder())
+                        .map(Path::toFile)
+                        .forEach(java.io.File::delete);
             }
-
-            Files.delete(file);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

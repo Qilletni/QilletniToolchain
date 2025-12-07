@@ -21,13 +21,13 @@ public class QllInfoGenerator {
             .registerTypeAdapter(Version.class, new VersionTypeAdapter())
             .create();
     
-    public void writeQllInfo(QllInfo qllInfo, Path destinationDir) throws IOException {
+    public static void writeQllInfo(QllInfo qllInfo, Path destinationDir) throws IOException {
         var json = gson.toJson(qllInfo);
         
         Files.writeString(destinationDir.resolve("qll.info"), json);
     }
     
-    public QllInfo readQllInfo(InputStream qllInfoPath) {
+    public static QllInfo readPackagedQllInfo(InputStream qllInfoPath) {
         return gson.fromJson(new InputStreamReader(qllInfoPath), QllInfo.class);
     }
     

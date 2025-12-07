@@ -22,48 +22,33 @@ import java.util.Optional;
 
 public class QilletniInfoParser {
     
-    private static final Logger LOGGER = LoggerFactory.getLogger(QilletniInfoParser.class);
-
     /**
-     * The name of the Qilletni program/library info file, which has an extension in the
-     * {@link #QILLETNI_FILE_EXTENSIONS} array.
-      */
-    private static final String QILLETNI_INFO = "qilletni_info";
-
-    /**
-     * The potential extensions of the file of name {@link #QILLETNI_INFO}.
-     */
-    private static final String[] QILLETNI_FILE_EXTENSIONS = {"yml", "yaml"};
-
-    /**
-     * Locates a {@link #QILLETNI_INFO} file directly in the given directory, and returns its path.
+     * Locates a qilletni_info.yml file directly in the given directory, and returns its path.
      * 
      * @param directory The direct parent of the info file
      * @return The {@code qilletni_info} file, if it exists
      */
     public static Optional<Path> findQilletniInfoFile(Path directory) {
-        for (var fileExtension : QILLETNI_FILE_EXTENSIONS) {
-            var qilletniInfoFile = directory.resolve(String.format("%s.%s", QILLETNI_INFO, fileExtension));
+        var qilletniInfoFile = directory.resolve(String.format("qilletni_info.yml"));
 
-            if (Files.exists(qilletniInfoFile)) {
-                return Optional.of(qilletniInfoFile);
-            }
+        if (Files.exists(qilletniInfoFile)) {
+            return Optional.of(qilletniInfoFile);
         }
-        
+
         return Optional.empty();
     }
 
     /**
-     * Reads the {@link #QILLETNI_INFO} file in the given Qilletni source parent directory.
+     * Reads the qilletni_info.yml file in the given Qilletni source parent directory.
      * 
-     * @param qilletniDirectory The parent directory of the {@link #QILLETNI_INFO} file and all {@code .ql} source
+     * @param qilletniDirectory The parent directory of the qilletni_info.yml file and all {@code .ql} source
      *                          files.
-     * @return The read {@link #QILLETNI_INFO} file data
+     * @return The read qilletni_info.yml file data
      * @throws IOException
      */
     public static QilletniInfoData readQilletniInfo(Path qilletniDirectory) throws IOException {
         var qilletniInfoFile = findQilletniInfoFile(qilletniDirectory)
-                .orElseThrow(() -> new FileNotFoundException(QILLETNI_INFO + " file not found! in " + qilletniDirectory.toString()));
+                .orElseThrow(() -> new FileNotFoundException("qilletni_info.yml file not found! in " + qilletniDirectory.toString()));
 
         var yaml = new Yaml();
         Map<String, Object> obj = yaml.load(Files.newInputStream(qilletniInfoFile));

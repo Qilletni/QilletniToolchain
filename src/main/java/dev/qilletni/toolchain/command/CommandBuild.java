@@ -92,8 +92,7 @@ public class CommandBuild implements Callable<Integer> {
 
         qilletniSourceHandler.moveQilletniSource(qllBuildPath, sourcePath);
 
-        var qllInfoGenerator = new QllInfoGenerator();
-        qllInfoGenerator.writeQllInfo(new QllInfo(qilletniInfo), qllBuildPath);
+        QllInfoGenerator.writeQllInfo(new QllInfo(qilletniInfo), qllBuildPath);
 
         var defaultQllFileName = "%s-%s.qll".formatted(qilletniInfo.name(), qilletniInfo.version().getVersionString());
         Path destinationFile;
