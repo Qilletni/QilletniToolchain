@@ -12,12 +12,17 @@ import java.nio.file.Path;
 public class DocumentationOrchestrator {
     
     private static final Logger LOGGER = LoggerFactory.getLogger(DocumentationOrchestrator.class);
+
+    private final DocGenerator docGenerator;
+
+    public DocumentationOrchestrator(Path cacheDirectory, Path outputDirectory) {
+        this.docGenerator = new DocGenerator(cacheDirectory, outputDirectory);
+    }
     
-    public int beginDocGen(QllInfo qllInfo, Path cacheDirectory, Path inputDirectory, Path outputDirectory) {
+    public int beginDocGen(QllInfo qllInfo, Path inputDirectory) {
         LOGGER.debug("Generating docs for: {}", qllInfo.name());
 
         try {
-            var docGenerator = new DocGenerator(cacheDirectory, outputDirectory);
             docGenerator.generateDocs(inputDirectory, qllInfo);
             
             docGenerator.regenerateGlobalIndex();
@@ -26,6 +31,19 @@ public class DocumentationOrchestrator {
             return 1;
         }
         
+        return 0;
+    }
+
+    public int regenerateAlPackages() {
+        try {
+            docGenerator.regenerateAllCachedDocs();
+
+            docGenerator.regenerateGlobalIndex();
+        } catch (IOException e) {
+            LOGGER.error("Failed to regenerate all packages' docs", e);
+            return 1;
+        }
+
         return 0;
     }
     

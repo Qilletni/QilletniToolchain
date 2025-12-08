@@ -24,7 +24,7 @@ public class CommandDoc implements Callable<Integer> {
     @CommandLine.Option(names = { "-h", "--help" }, usageHelp = true, description = "Display a help message")
     private boolean helpRequested = false;
 
-    @CommandLine.Parameters(description = "Either a .qll or a source qilletni-src directory", index = "0")
+    @CommandLine.Parameters(description = "Either a .qll or a source qilletni-src directory", index = "0", arity = "0..1")
     public Path sourcePath;
 
     @CommandLine.Option(names = {"--output-file", "-o"}, description = "The directory to put the generated docs in")
@@ -32,6 +32,9 @@ public class CommandDoc implements Callable<Integer> {
 
     @CommandLine.Option(names = {"--cache-path", "-c"}, description = "The directory containing the cache of the docs")
     public Path cachePath;
+
+    @CommandLine.Option(names = {"--regen-all", "-r"}, description = "Regenerate all doc files from every package in cache")
+    public boolean regenerateAll;
     
     @Override
     public Integer call() throws Exception {
@@ -40,6 +43,24 @@ public class CommandDoc implements Callable<Integer> {
         
         if (cachePath == null) {
             cachePath = PathUtility.getCachePath();
+        }
+
+        var documentationOrchestrator = new DocumentationOrchestrator(cachePath, outputFilePath);
+
+        if (regenerateAll) {
+            if (sourcePath == null) {
+                LOGGER.debug("Refreshing cache");
+
+                return documentationOrchestrator.regenerateAlPackages();
+            }
+
+            LOGGER.error("Unexpected source path when regenerating all: {}", sourcePath);
+            return 1;
+        }
+
+        if (sourcePath == null) {
+            LOGGER.error("No source path provided");
+            return 1;
         }
         
         LOGGER.debug("Cache path: {}", cachePath);
@@ -63,8 +84,7 @@ public class CommandDoc implements Callable<Integer> {
                 qllInfo = new QllInfo(QilletniInfoParser.readQilletniInfo(sourcePath));
             }
 
-            var documentationOrchestrator = new DocumentationOrchestrator();
-            return documentationOrchestrator.beginDocGen(qllInfo, cachePath, sourcePath, outputFilePath);
+            return documentationOrchestrator.beginDocGen(qllInfo, sourcePath);
         } finally {
             if (extractedDir != null) {
                 FileUtil.deleteDirectory(extractedDir);

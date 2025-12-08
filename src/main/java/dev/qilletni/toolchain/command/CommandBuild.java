@@ -86,7 +86,8 @@ public class CommandBuild implements Callable<Integer> {
                     Files.copy(gradleJar, qllBuildPath.resolve("native.jar"));
                 }
             } else {
-                LOGGER.info("Unable to find jar output found in Gradle project");
+                LOGGER.error("Unable to find jar output found in Gradle project");
+                return 1;
             }
         }
 

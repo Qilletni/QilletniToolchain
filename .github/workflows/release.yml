@@ -1,6 +1,8 @@
 name: Publish
 
 on:
+  # Manual dispatch if dependencies need to be updated
+  workflow_dispatch:
   push:
     branches:
       - master

@@ -111,6 +111,7 @@ public class CommandRun implements Callable<Integer> {
                         }
                     } else {
                         LOGGER.error("Unable to find jar output found in Gradle project");
+                        return 1;
                     }
                 }
             }
