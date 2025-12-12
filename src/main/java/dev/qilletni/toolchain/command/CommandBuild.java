@@ -62,7 +62,7 @@ public class CommandBuild implements Callable<Integer> {
 
         var qilletniSourceHandler = new QilletniSourceHandler();
 
-        var qllBuildPath = buildDirectory.resolve("ql-build");
+        var qllBuildPath = buildDirectory.resolve("ql-build").resolve(qilletniInfo.name());
 
         FileUtil.clearAndCreateDirectory(qllBuildPath);
 
