@@ -1,6 +1,7 @@
 package dev.qilletni.toolchain.init;
 
 import dev.qilletni.toolchain.qll.QPMUtility;
+import dev.qilletni.toolchain.utils.ProgressDisplay;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,7 +14,7 @@ public class ProjectInit {
     
     private static final Logger LOGGER = LoggerFactory.getLogger(ProjectInit.class);
     
-    private static final String GRADLE_VERSION = "8.8";
+    private static final String GRADLE_VERSION = "8.14.3";
     
     /**
      * @param sourcePath      The project directory
@@ -39,6 +40,7 @@ public class ProjectInit {
                 author: %s%s
                 dependencies:
                     qilletni/std: ^1.0.0
+                    qilletni/spotify: ^1.0.0
                 """.formatted(scopedProjectName, authorName, nativeInit == null ? "" : "\n" + nativeInit.getNativeClassesList());
         
         Files.writeString(qilletniSrc.resolve("qilletni_info.yml"), yml);
@@ -65,7 +67,7 @@ public class ProjectInit {
         }
         
         if (nativeInit != null) {
-            LOGGER.debug("Creating Gradle project...");
+            ProgressDisplay.info("Creating Gradle project...");
             var gradleProjectInitializer = new GradleProjectInitializer(sourcePath, sourcePath.getFileName().toString(), nativeInit.packageName, nativeInit.className, GRADLE_VERSION);
             gradleProjectInitializer.initializeProject();
         }
@@ -78,7 +80,7 @@ public class ProjectInit {
                 LOGGER.error("Unable to install dependencies: {}", processResult.stdErr());
             }
         } else {
-            LOGGER.error("qpm is not installed, unable to install packages");
+            ProgressDisplay.warn("qpm is not installed, unable to install packages");
         }
     }
     
@@ -114,6 +116,7 @@ public class ProjectInit {
 
         if (nativeInit != null) {
             starterFileContents += """
+                    
                     native fun sayGoodbye()
                     """;
         }
@@ -131,6 +134,7 @@ public class ProjectInit {
 
         if (nativeInit != null) {
             exampleContents += """
+                    
                     // Say goodbye from the native function, printed from Java
                     sayGoodbye()
                     """;

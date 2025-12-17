@@ -1,4 +1,4 @@
-name: Publish
+name: Publish Artifact
 
 on:
   # Manual dispatch if dependencies need to be updated

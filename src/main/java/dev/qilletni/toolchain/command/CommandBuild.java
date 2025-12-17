@@ -1,13 +1,14 @@
 package dev.qilletni.toolchain.command;
 
 import dev.qilletni.api.lib.qll.QllInfo;
-import dev.qilletni.toolchain.FileUtil;
+import dev.qilletni.toolchain.utils.FileUtil;
 import dev.qilletni.toolchain.LogSetup;
 import dev.qilletni.toolchain.config.QilletniInfoParser;
 import dev.qilletni.toolchain.qll.GradleProjectHelper;
 import dev.qilletni.toolchain.qll.QilletniSourceHandler;
 import dev.qilletni.toolchain.qll.QllInfoGenerator;
 import dev.qilletni.toolchain.qll.QllPackager;
+import dev.qilletni.toolchain.utils.ProgressDisplay;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -35,7 +36,7 @@ public class CommandBuild implements Callable<Integer> {
     @CommandLine.Option(names = {"--no-build-jar", "-n"}, description = "Qilletni should not rebuild build the native .jar")
     public boolean noBuildJar;
     
-    @CommandLine.Option(names = {"--verbose", "-v"}, description = "Verbose Gradle output")
+    @CommandLine.Option(names = {"--gradle-verbose", "-g"}, description = "Verbose Gradle output")
     public boolean verboseGradleOutput;
 
     @CommandLine.Option(names = {"--log-port", "-p"}, defaultValue = "-1", description = "The port to use for logging")
@@ -53,6 +54,8 @@ public class CommandBuild implements Callable<Integer> {
 
         LOGGER.debug("Output file/directory: {}", outputFilePath);
 
+        ProgressDisplay.info("Building Qilletni library...");
+
         var sourcePath = projectRoot.resolve("qilletni-src");
         var buildDirectory = projectRoot.resolve("build");
 
@@ -67,6 +70,8 @@ public class CommandBuild implements Callable<Integer> {
         FileUtil.clearAndCreateDirectory(qllBuildPath);
 
         if (GradleProjectHelper.isGradleProject(projectRoot)) {
+            ProgressDisplay.info("Building native.jar...");
+
             var gradleProjectHelper = GradleProjectHelper.createProjectHelper(projectRoot).orElseThrow(() -> new RuntimeException("Unable to configure Gradle project"));
             var gradleJarOptional = gradleProjectHelper.findProjectJar(verboseGradleOutput);
             
@@ -84,9 +89,11 @@ public class CommandBuild implements Callable<Integer> {
                 // Copy it if it's been created
                 if (Files.exists(gradleJar)) {
                     Files.copy(gradleJar, qllBuildPath.resolve("native.jar"));
+                } else {
+                    ProgressDisplay.warn("The expected native jar path was identified but the file does not exist.");
                 }
             } else {
-                LOGGER.error("Unable to find jar output found in Gradle project");
+                ProgressDisplay.error("Unable to find native jar in Gradle project");
                 return 1;
             }
         }
@@ -121,6 +128,8 @@ public class CommandBuild implements Callable<Integer> {
         qllPackager.packageQll(qllBuildPath, destinationFile);
 
         LOGGER.info("Built library to {}", destinationFile.toAbsolutePath());
+
+        ProgressDisplay.success("Library built successfully!\n  Destination: %s".formatted(destinationFile));
 
         return 0;
     }

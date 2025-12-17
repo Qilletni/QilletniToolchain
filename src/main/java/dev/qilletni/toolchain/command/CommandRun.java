@@ -7,11 +7,12 @@ import dev.qilletni.impl.lang.runner.QilletniProgramRunner;
 import dev.qilletni.impl.lib.LibrarySourceFileResolver;
 import dev.qilletni.pkgutil.manifest.ManifestFinder;
 import dev.qilletni.toolchain.LogSetup;
-import dev.qilletni.toolchain.PathUtility;
+import dev.qilletni.toolchain.utils.PathUtility;
 import dev.qilletni.toolchain.qll.GradleProjectHelper;
 import dev.qilletni.toolchain.qll.LibraryValidator;
 import dev.qilletni.toolchain.qll.QllJarExtractor;
 import dev.qilletni.toolchain.qll.QllLoader;
+import dev.qilletni.toolchain.utils.ProgressDisplay;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -38,7 +39,7 @@ public class CommandRun implements Callable<Integer> {
     @CommandLine.Option(names = {"-h", "--help"}, usageHelp = true, description = "Display a help message")
     private boolean helpRequested = false;
 
-    @CommandLine.Option(names = {"--local-library", "-l"}, description = "If running a library example, the path of the library root it's in")
+    @CommandLine.Option(names = {"--local-library", "-l"}, defaultValue = ".", description = "If running a library example, the path of the library root it's in")
     private Path localLibrary;
 
     @CommandLine.Option(names = {"--use-native-jar", "-j"}, description = "If running a library example, use the native jar of it")
@@ -175,7 +176,7 @@ public class CommandRun implements Callable<Integer> {
                 LOGGER.debug("Running program: {}", file.getFileName());
                 runner.runProgram(file);
             } catch (QilletniException | IOException e) {
-                LOGGER.error("An exception occurred while running {}", file.getFileName(), e);
+                ProgressDisplay.error("An exception occurred while running %s", e, file.getFileName());
                 runner.shutdown();
                 return 1;
             }

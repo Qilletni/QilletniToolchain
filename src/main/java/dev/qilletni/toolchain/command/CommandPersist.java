@@ -2,6 +2,7 @@ package dev.qilletni.toolchain.command;
 
 import dev.qilletni.api.lib.persistence.PackageConfig;
 import dev.qilletni.impl.lib.persistence.PackageConfigImpl;
+import dev.qilletni.toolchain.utils.ProgressDisplay;
 import picocli.CommandLine;
 
 import java.util.List;
@@ -51,7 +52,7 @@ public class CommandPersist implements Callable<Integer> {
         
         if (!keys.isEmpty()) {
             if (remove) {
-                System.out.println("Removing: " + String.join(", ", keys));
+                ProgressDisplay.info("Removing: %s", String.join(", ", keys));
                 keys.forEach(packageConfig::remove);
 
                 packageConfig.saveConfig();
@@ -67,7 +68,7 @@ public class CommandPersist implements Callable<Integer> {
                 var key = parts[0];
                 var value = parts[1];
 
-                System.out.printf("Parameter '%s' set to '%s' in package '%s'.%n", key, value, packageName);
+                ProgressDisplay.info("Parameter '%s' set to '%s' in package '%s'.", key, value, packageName);
                 packageConfig.set(key, value);
             });
             

@@ -2,6 +2,7 @@ package dev.qilletni.toolchain.command;
 
 import dev.qilletni.toolchain.init.ProjectInit;
 import dev.qilletni.toolchain.init.ProjectType;
+import dev.qilletni.toolchain.utils.ProgressDisplay;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -64,7 +65,7 @@ public class CommandInit implements Callable<Integer> {
         ProjectType projectTypeEnum;
         
         if ("library".equals(projectType)) {
-            LOGGER.debug("Creating library project");
+            ProgressDisplay.info("Initializing a library project...");
             projectTypeEnum = ProjectType.LIBRARY;
 
             if (projectScope == null || projectScope.isEmpty()) {
@@ -72,14 +73,12 @@ public class CommandInit implements Callable<Integer> {
                 return 1;
             }
         } else if ("application".equals(projectType)) {
-            LOGGER.debug("Creating application project");
+            ProgressDisplay.info("Initializing an application project...");
             projectTypeEnum = ProjectType.APPLICATION;
         } else {
-            LOGGER.error("Invalid project type: {}", projectType);
+            ProgressDisplay.error("Invalid project type: %s", projectType);
             return 1;
         }
-
-        var scanner = new Scanner(System.in);
 
         ProjectInit.NativeInit nativeInit = null;
         

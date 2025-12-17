@@ -1,4 +1,4 @@
-package dev.qilletni.toolchain;
+package dev.qilletni.toolchain.utils;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

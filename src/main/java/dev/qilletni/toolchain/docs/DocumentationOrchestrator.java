@@ -1,8 +1,8 @@
 package dev.qilletni.toolchain.docs;
 
-import dev.qilletni.api.lib.qll.QilletniInfoData;
 import dev.qilletni.api.lib.qll.QllInfo;
 import dev.qilletni.docgen.DocGenerator;
+import dev.qilletni.toolchain.utils.ProgressDisplay;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,9 +23,13 @@ public class DocumentationOrchestrator {
         LOGGER.debug("Generating docs for: {}", qllInfo.name());
 
         try {
+            ProgressDisplay.info("Generating docs...");
             docGenerator.generateDocs(inputDirectory, qllInfo);
-            
+
+            ProgressDisplay.info("Regenerating global index...");
             docGenerator.regenerateGlobalIndex();
+
+            ProgressDisplay.success("Generated docs");
         } catch (IOException e) {
             LOGGER.error("Failed to generate docs for: {}", qllInfo.name(), e);
             return 1;
@@ -34,7 +38,7 @@ public class DocumentationOrchestrator {
         return 0;
     }
 
-    public int regenerateAlPackages() {
+    public int regenerateAllPackages() {
         try {
             docGenerator.regenerateAllCachedDocs();
 
