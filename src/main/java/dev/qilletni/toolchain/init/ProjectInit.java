@@ -40,7 +40,7 @@ public class ProjectInit {
                 author: %s%s
                 dependencies:
                     qilletni/std: ^1.0.0
-                    qilletni/spotify: ^1.0.0
+                
                 """.formatted(scopedProjectName, authorName, nativeInit == null ? "" : "\n" + nativeInit.getNativeClassesList());
         
         Files.writeString(qilletniSrc.resolve("qilletni_info.yml"), yml);
@@ -48,6 +48,7 @@ public class ProjectInit {
         var gitignore = """
                 .gradle
                 build/
+                
                 """;
 
         Files.writeString(sourcePath.resolve(".gitignore"), gitignore);

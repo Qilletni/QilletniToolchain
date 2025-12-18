@@ -20,11 +20,11 @@ public class CommandInit implements Callable<Integer> {
     @CommandLine.Option(names = { "-h", "--help" }, usageHelp = true, description = "Display a help message")
     private boolean helpRequested = false;
 
-    @CommandLine.Parameters(description = "The directory to initialize the project in. Default is the project name.", defaultValue = "", index = "0")
-    public String sourcePathStr;
-
-    @CommandLine.Option(names = {"--name", "-n"}, description = "The name of the project")
+    @CommandLine.Parameters(description = "The name of the project", index = "0")
     public String scopedProjectName;
+
+    @CommandLine.Option(names = {"--dir", "-d"}, description = "The directory to initialize the project in. Default is the project name.", defaultValue = "")
+    public String sourcePathStr;
 
     @CommandLine.Option(names = {"--author", "-a"}, description = "The author of the project. Defaults to the scope, if available", defaultValue = "me")
     public String authorName;
@@ -54,6 +54,7 @@ public class CommandInit implements Callable<Integer> {
             }
         }
 
+        // If it it unset ("") and it's been given a project name
         if ("".equals(sourcePathStr) && projectName != null) {
             sourcePathStr = projectName;
         }
