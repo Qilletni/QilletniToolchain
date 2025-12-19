@@ -1,13 +1,10 @@
 package dev.qilletni.toolchain.command;
 
 import dev.qilletni.api.lib.qll.QllInfo;
+import dev.qilletni.toolchain.qll.*;
 import dev.qilletni.toolchain.utils.FileUtil;
 import dev.qilletni.toolchain.LogSetup;
 import dev.qilletni.toolchain.config.QilletniInfoParser;
-import dev.qilletni.toolchain.qll.GradleProjectHelper;
-import dev.qilletni.toolchain.qll.QilletniSourceHandler;
-import dev.qilletni.toolchain.qll.QllInfoGenerator;
-import dev.qilletni.toolchain.qll.QllPackager;
 import dev.qilletni.toolchain.utils.ProgressDisplay;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,7 +85,7 @@ public class CommandBuild implements Callable<Integer> {
 
                 // Copy it if it's been created
                 if (Files.exists(gradleJar)) {
-                    Files.copy(gradleJar, qllBuildPath.resolve("native.jar"));
+                    QllJarExtractor.copyExtractedJar(gradleJar, qllBuildPath);
                 } else {
                     ProgressDisplay.warn("The expected native jar path was identified but the file does not exist.");
                 }

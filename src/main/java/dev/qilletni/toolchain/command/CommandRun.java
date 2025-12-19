@@ -80,8 +80,6 @@ public class CommandRun implements Callable<Integer> {
             dependencyPath = PathUtility.getDependencyPath();
         }
 
-        var tempRunDir = Files.createTempDirectory("ql-run");
-
         var qllLoader = new QllLoader();
         var qllJarExtractor = new QllJarExtractor();
         var librarySourceFileResolver = new LibrarySourceFileResolver();
@@ -106,7 +104,7 @@ public class CommandRun implements Callable<Integer> {
 
                         // Copy it if it's been created
                         if (Files.exists(gradleJar)) {
-                            qllJarExtractor.copyLocalNativeJar(gradleJar, tempRunDir, localLibraryQll);
+                            qllJarExtractor.addLocalLibraryJar(gradleJar);
                         } else {
                             LOGGER.error("Expected to find jar file {}, has it been built?", gradleJar);
                         }
@@ -128,8 +126,7 @@ public class CommandRun implements Callable<Integer> {
                         .forEach(resolvedPackage -> {
                             var qllPath = dependencyPath.resolve(resolvedPackage.resolved() + ".qll");
 
-                            // TODO: Improve jar extraction
-                            qllJarExtractor.extractJarTo(resolvedPackage, qllPath, tempRunDir);
+                            qllJarExtractor.registerInnerJar(qllPath);
 
                             try {
                                 var loadedQll = qllLoader.loadQll(librarySourceFileResolver, qllPath);
