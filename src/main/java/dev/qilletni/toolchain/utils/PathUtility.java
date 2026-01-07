@@ -17,6 +17,16 @@ public class PathUtility {
         return qilletniDir;
     }
 
+    public static Path getLocalDependencyPath() throws IOException {
+        var userHome = System.getProperty("user.home");
+
+        var qilletniDir = Paths.get(userHome, ".qilletni", "packages-local");
+
+        Files.createDirectories(qilletniDir);
+
+        return qilletniDir;
+    }
+
     public static  Path getCachePath() throws IOException {
         var userHome = System.getProperty("user.home");
 

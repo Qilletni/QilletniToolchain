@@ -38,16 +38,17 @@ public class QilletniToolchainApplication {
 
     public static void main(String[] args) {
         var application = new QilletniToolchainApplication();
+        var commandLine = new CommandLine(application);
 
         if (args.length == 0) {
-            LOGGER.error("Invalid command!");
-            return;
+            commandLine.usage(System.out);
+            System.exit(0);
         }
 
         LOGGER.info("Executing command with args:  {}", Arrays.stream(args).map("'%s'"::formatted).collect(Collectors.joining(" ")));
 
-        new CommandLine(application)
-                .execute(args);
+        int exitCode = commandLine.execute(args);
+        System.exit(exitCode);
     }
 
     private static boolean verbose = false;

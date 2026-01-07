@@ -118,13 +118,24 @@ public class CommandRun implements Callable<Integer> {
             // TODO: Test local libraries with dependencies
         }
 
+        var dependencyPath = PathUtility.getDependencyPath();
+        var localDependencyPath = PathUtility.getLocalDependencyPath();
+
         var localLibraryName = localLibraryQll != null ? localLibraryQll.name() : null;
 
         if (useLockfile) {
             try {
                 qllLoader.getResolvedPackages(lockfilePath)
                         .forEach(resolvedPackage -> {
-                            var qllPath = dependencyPath.resolve(resolvedPackage.resolved() + ".qll");
+                            var qllPath = localDependencyPath.resolve(resolvedPackage.resolved() + ".qll");
+                            if (!Files.exists(qllPath)) {
+                                qllPath = dependencyPath.resolve(resolvedPackage.resolved() + ".qll");
+                            }
+
+                            if (Files.notExists(qllPath)) {
+                                ProgressDisplay.error("Unable to find package %s", resolvedPackage.name());
+                                return;
+                            }
 
                             qllJarExtractor.registerInnerJar(qllPath);
 
@@ -142,7 +153,7 @@ public class CommandRun implements Callable<Integer> {
                             }
                 });
             } catch (IOException e) {
-                LOGGER.error("An exception occurred while reading dependencies", e);
+                ProgressDisplay.error("An exception occurred while reading dependencies", e);
             }
         }
 
@@ -150,7 +161,7 @@ public class CommandRun implements Callable<Integer> {
 
         var libraryValidator = new LibraryValidator(loadedLibraries);
         if (!libraryValidator.validate()) {
-            LOGGER.error("Exiting due to unmet dependencies. Try deleting qilletni.lock and re-installing dependencies");
+            ProgressDisplay.error("Exiting due to unmet dependencies. Try deleting qilletni.lock and re-installing dependencies");
             return 1;
         }
 

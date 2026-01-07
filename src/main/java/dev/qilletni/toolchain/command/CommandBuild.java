@@ -67,7 +67,7 @@ public class CommandBuild implements Callable<Integer> {
         FileUtil.clearAndCreateDirectory(qllBuildPath);
 
         if (GradleProjectHelper.isGradleProject(projectRoot)) {
-            ProgressDisplay.info("Building native.jar...");
+            ProgressDisplay.info("Building native jar...");
 
             var gradleProjectHelper = GradleProjectHelper.createProjectHelper(projectRoot).orElseThrow(() -> new RuntimeException("Unable to configure Gradle project"));
             var gradleJarOptional = gradleProjectHelper.findProjectJar(verboseGradleOutput);

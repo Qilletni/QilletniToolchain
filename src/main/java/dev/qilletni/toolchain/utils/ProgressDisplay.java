@@ -46,11 +46,13 @@ public class ProgressDisplay {
      * @param message the error message
      */
     public static void error(String message, Object... args) {
-        System.err.println(ColorSupport.red("Error:") + " " + message.formatted(args));
+        var formattedMessage = message.formatted(args);
+
+        System.err.println(ColorSupport.red("Error:") + " " + formattedMessage);
 
         // If logger is going to console, don't duplicate this message
         if (!QilletniToolchainApplication.isVerbose()) {
-            LOGGER.error("Error: {}", message);
+            LOGGER.error("Error: {}", formattedMessage);
         }
     }
 
@@ -60,12 +62,14 @@ public class ProgressDisplay {
      * @param message the error message
      */
     public static void error(String message, Throwable e, Object... args) {
-        System.err.println(ColorSupport.red("Error:") + " " + message.formatted(args));
+        var formattedMessage = message.formatted(args);
+
+        System.err.println(ColorSupport.red("Error:") + " " + formattedMessage);
         e.printStackTrace();
 
         // If logger is going to console, don't duplicate this message
         if (!QilletniToolchainApplication.isVerbose()) {
-            LOGGER.error("Error: %s".formatted(args), e);
+            LOGGER.error("Error: %s".formatted(formattedMessage), e);
         }
     }
 

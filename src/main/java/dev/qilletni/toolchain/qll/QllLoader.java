@@ -39,8 +39,6 @@ public class QllLoader {
 
             LOGGER.debug("qllInfo = {}", qllInfo);
 
-//            qllJarClassLoader.loadJar(zipFile.getInputStream(zipFile.getEntry("native.jar")));
-
             var srcPathInZip = zipFs.getPath("qilletni-src");
 
             var sourceMap = new HashMap<String, String>();
