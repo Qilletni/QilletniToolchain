@@ -39,7 +39,7 @@ public class CommandRun implements Callable<Integer> {
     @CommandLine.Option(names = {"-h", "--help"}, usageHelp = true, description = "Display a help message")
     private boolean helpRequested = false;
 
-    @CommandLine.Option(names = {"--local-library", "-l"}, defaultValue = ".", description = "If running a library example, the path of the library root it's in")
+    @CommandLine.Option(names = {"--local-library", "-l"}, arity = "0..1", fallbackValue = ".", description = "If running a library example, the path of the library root it's in")
     private Path localLibrary;
 
     @CommandLine.Option(names = {"--use-native-jar", "-j"}, description = "If running a library example, use the native jar of it")
@@ -93,6 +93,7 @@ public class CommandRun implements Callable<Integer> {
             loadedLibraries.add(localLibraryQll);
 
             if (useNativeJar) {
+                LOGGER.debug("Using native jar");
                 if (GradleProjectHelper.isGradleProject(localLibrary)) {
                     var gradleProjectHelper = GradleProjectHelper.createProjectHelper(localLibrary).orElseThrow(() -> new RuntimeException("Unable to interact with Gradle project"));
                     var gradleJarOptional = gradleProjectHelper.findProjectJar(false);
