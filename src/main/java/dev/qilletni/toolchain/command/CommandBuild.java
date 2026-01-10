@@ -5,7 +5,7 @@ import dev.qilletni.toolchain.qll.*;
 import dev.qilletni.toolchain.utils.FileUtil;
 import dev.qilletni.toolchain.LogSetup;
 import dev.qilletni.toolchain.config.QilletniInfoParser;
-import dev.qilletni.toolchain.utils.ProgressDisplay;
+import dev.qilletni.toolchain.logging.ProgressDisplay;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -90,7 +90,7 @@ public class CommandBuild implements Callable<Integer> {
                     ProgressDisplay.warn("The expected native jar path was identified but the file does not exist.");
                 }
             } else {
-                ProgressDisplay.error("Unable to find native jar in Gradle project");
+                LOGGER.error("Unable to find native jar in Gradle project");
                 return 1;
             }
         }

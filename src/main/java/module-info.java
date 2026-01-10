@@ -10,4 +10,5 @@ module qilletni.toolchain {
     requires info.picocli;
     requires com.google.gson;
     requires org.apache.logging.log4j.core;
+    requires qilletni.toolchain.logging;
 }

@@ -7,7 +7,7 @@ import dev.qilletni.toolchain.config.QilletniInfoParser;
 import dev.qilletni.toolchain.docs.DocumentationOrchestrator;
 import dev.qilletni.toolchain.qll.QllExtractor;
 import dev.qilletni.toolchain.qll.QllInfoGenerator;
-import dev.qilletni.toolchain.utils.ProgressDisplay;
+import dev.qilletni.toolchain.logging.ProgressDisplay;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -58,12 +58,12 @@ public class CommandDoc implements Callable<Integer> {
             }
 
             LOGGER.error("Unexpected source path when regenerating all: {}", sourcePath);
-            ProgressDisplay.error("Cannot regenerate all docs when a specific source path is provided");
+            LOGGER.error("Cannot regenerate all docs when a specific source path is provided");
             return 1;
         }
 
         if (sourcePath == null) {
-            ProgressDisplay.error("No source path provided");
+            LOGGER.error("No source path provided");
             return 1;
         }
         
@@ -76,7 +76,7 @@ public class CommandDoc implements Callable<Integer> {
             if (sourcePath.getFileName().toString().endsWith(".qll")) {
                 Optional<Path> path = QllExtractor.extractToTmp(sourcePath);
                 if (path.isEmpty()) {
-                    ProgressDisplay.error("Unable to extract QLL from %s", sourcePath);
+                    LOGGER.error("Unable to extract QLL from {}", sourcePath);
                     return 1;
                 }
 

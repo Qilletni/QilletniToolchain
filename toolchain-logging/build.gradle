@@ -1,0 +1,38 @@
+plugins {
+    id 'java'
+}
+
+group = 'dev.qilletni.toolchain'
+version = '1.0.0-SNAPSHOT'
+
+sourceCompatibility = JavaVersion.VERSION_22
+targetCompatibility = JavaVersion.VERSION_22
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+
+    maven {
+        url = 'https://central.sonatype.com/repository/maven-snapshots/'
+    }
+}
+
+dependencies {
+    // Log4j2 core for the plugin system
+    implementation 'org.apache.logging.log4j:log4j-api:2.25.1'
+    implementation 'org.apache.logging.log4j:log4j-core:2.25.3'
+    annotationProcessor 'org.apache.logging.log4j:log4j-core:2.25.3'
+
+    implementation 'dev.qilletni.api:qilletni-api:1.0.0-SNAPSHOT'
+
+    // SLF4J for logging (used by ProgressDisplay)
+    implementation 'org.slf4j:slf4j-api:2.0.16'
+
+    // PicoCLI for ANSI color support (used by ColorSupport)
+    implementation 'info.picocli:picocli:4.7.5'
+}
+
+compileJava {
+    options.compilerArgs << '-Alog4j.graalvm.groupId=dev.qilletni.toolchain'
+    options.compilerArgs << '-Alog4j.graalvm.artifactId=toolchain-logging'
+}

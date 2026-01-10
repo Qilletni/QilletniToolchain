@@ -2,14 +2,13 @@ package dev.qilletni.toolchain.command;
 
 import dev.qilletni.toolchain.init.ProjectInit;
 import dev.qilletni.toolchain.init.ProjectType;
-import dev.qilletni.toolchain.utils.ProgressDisplay;
+import dev.qilletni.toolchain.logging.ProgressDisplay;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.Scanner;
 import java.util.concurrent.Callable;
 
 @CommandLine.Command(name = "init", description = "Initializes a Qilletni project")
@@ -77,7 +76,7 @@ public class CommandInit implements Callable<Integer> {
             ProgressDisplay.info("Initializing an application project...");
             projectTypeEnum = ProjectType.APPLICATION;
         } else {
-            ProgressDisplay.error("Invalid project type: %s", projectType);
+            LOGGER.error("Invalid project type: {}", projectType);
             return 1;
         }
 

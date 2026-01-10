@@ -28,10 +28,10 @@ repositories {
 dependencies {
     implementation 'info.picocli:picocli:4.7.5'
     annotationProcessor 'info.picocli:picocli-codegen:4.7.5'
-    
+
     implementation 'dev.qilletni.impl:qilletni:1.0.0-SNAPSHOT'
     implementation 'dev.qilletni.impl:qilletni:1.0.0-SNAPSHOT:sources'
-    
+
     implementation 'dev.qilletni.api:qilletni-api:1.0.0-SNAPSHOT'
     implementation 'dev.qilletni.pkgutil:qilletni-pkgutil:1.0.0-SNAPSHOT'
     implementation 'dev.qilletni.docgen:qilletni-docgen:1.0.0-SNAPSHOT'
@@ -40,10 +40,13 @@ dependencies {
     implementation 'org.yaml:snakeyaml:2.2'
     implementation 'com.google.code.gson:gson:2.10.1'
 
+    // Logging infrastructure subproject (contains Log4j2 plugin)
+    implementation project(':toolchain-logging')
+
     // SLF4J API dependency
-    implementation 'org.apache.logging.log4j:log4j-api:2.22.1'
-    implementation 'org.apache.logging.log4j:log4j-core:2.22.1'
-    implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.22.1'
+    implementation 'org.apache.logging.log4j:log4j-api:2.25.1'
+    implementation 'org.apache.logging.log4j:log4j-core:2.25.3'
+    implementation 'org.apache.logging.log4j:log4j-slf4j2-impl:2.25.1'
 
     implementation platform('com.fasterxml.jackson:jackson-bom:2.17.2')
     implementation 'com.fasterxml.jackson.core:jackson-core'
@@ -71,6 +74,8 @@ idea {
 }
 
 shadowJar {
+    transform(com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCacheFileTransformer)
+
     // Merge service files if needed
     mergeServiceFiles()
 

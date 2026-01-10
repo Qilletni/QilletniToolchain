@@ -1,0 +1,1 @@
+This subproject is to circumvent a bug in the Shadow plugin with log4j2. For details on this bug, see [https://github.com/apache/logging-log4j2/discussions/2416](https://github.com/apache/logging-log4j2/discussions/2416)

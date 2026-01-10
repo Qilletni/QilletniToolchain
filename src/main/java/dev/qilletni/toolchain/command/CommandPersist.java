@@ -2,7 +2,7 @@ package dev.qilletni.toolchain.command;
 
 import dev.qilletni.api.lib.persistence.PackageConfig;
 import dev.qilletni.impl.lib.persistence.PackageConfigImpl;
-import dev.qilletni.toolchain.utils.ProgressDisplay;
+import dev.qilletni.toolchain.logging.ProgressDisplay;
 import picocli.CommandLine;
 
 import java.util.List;

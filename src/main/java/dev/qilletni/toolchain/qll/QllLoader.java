@@ -80,12 +80,13 @@ public class QllLoader {
                         }
 
                         // Logging using Path components
-                        LOGGER.debug("Entry: {} (Path: {}) is of: {}, {} ({})",
-                                entry.getName(),
-                                entryPathInZip,
-                                fileName,
-                                root,
-                                relative);
+                        // This is SUPER verbose, ignore it
+//                        LOGGER.debug("Entry: {} (Path: {}) is of: {}, {} ({})",
+//                                entry.getName(),
+//                                entryPathInZip,
+//                                fileName,
+//                                root,
+//                                relative);
 
                         if (fileName.toString().endsWith(".ql") && root.equals("qilletni-src")) {
                             try (var is = zipFile.getInputStream(entry)) {

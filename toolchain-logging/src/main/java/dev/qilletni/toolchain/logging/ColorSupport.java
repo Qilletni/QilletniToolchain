@@ -1,4 +1,4 @@
-package dev.qilletni.toolchain.utils;
+package dev.qilletni.toolchain.logging;
 
 import picocli.CommandLine.Help.Ansi;
 

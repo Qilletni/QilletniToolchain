@@ -1,15 +1,30 @@
-package dev.qilletni.toolchain.utils;
+package dev.qilletni.toolchain.logging;
 
-import dev.qilletni.toolchain.QilletniToolchainApplication;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 
 /**
  * Utility class for displaying progress information to the user with color support.
  */
 public class ProgressDisplay {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ProgressDisplay.class);
+    // Marker to indicate this log has already been printed to console nicely
+    private static final Marker PRETTY_PRINTED = MarkerFactory.getMarker("PRETTY_PRINTED");
+
+    /**
+     * dynamically gets the logger of the class calling this utility.
+     */
+    private static Logger getCallerLogger() {
+        return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
+                .walk(frames -> frames
+                        .dropWhile(f -> f.getDeclaringClass().equals(ProgressDisplay.class))
+                        .findFirst()
+                        .map(StackWalker.StackFrame::getDeclaringClass)
+                        .map(LoggerFactory::getLogger)
+                        .orElse(LoggerFactory.getLogger(ProgressDisplay.class)));
+    }
 
     /**
      * Displays a simple progress message.
@@ -18,11 +33,6 @@ public class ProgressDisplay {
      */
     public static void info(String message, Object... args) {
         System.out.println(message.formatted(args));
-
-        // If logger is going to console, don't duplicate this message
-        if (!QilletniToolchainApplication.isVerbose()) {
-            LOGGER.info(message);
-        }
     }
 
     /**
@@ -33,11 +43,6 @@ public class ProgressDisplay {
      */
     public static void infoAction(String action, String target) {
         System.out.println(ColorSupport.cyan(action) + " " + target);
-
-        // If logger is going to console, don't duplicate this message
-        if (!QilletniToolchainApplication.isVerbose()) {
-            LOGGER.info("{} {}", action, target);
-        }
     }
 
     /**
@@ -49,11 +54,6 @@ public class ProgressDisplay {
         var formattedMessage = message.formatted(args);
 
         System.err.println(ColorSupport.red("Error:") + " " + formattedMessage);
-
-        // If logger is going to console, don't duplicate this message
-        if (!QilletniToolchainApplication.isVerbose()) {
-            LOGGER.error("Error: {}", formattedMessage);
-        }
     }
 
     /**
@@ -66,11 +66,6 @@ public class ProgressDisplay {
 
         System.err.println(ColorSupport.red("Error:") + " " + formattedMessage);
         e.printStackTrace();
-
-        // If logger is going to console, don't duplicate this message
-        if (!QilletniToolchainApplication.isVerbose()) {
-            LOGGER.error("Error: %s".formatted(formattedMessage), e);
-        }
     }
 
     /**
@@ -81,10 +76,7 @@ public class ProgressDisplay {
     public static void success(String message, Object... args) {
         System.out.println(ColorSupport.green("✓") + " " + message.formatted(args));
 
-        // If logger is going to console, don't duplicate this message
-        if (!QilletniToolchainApplication.isVerbose()) {
-            LOGGER.info(message);
-        }
+        getCallerLogger().info(PRETTY_PRINTED, message.formatted(args));
     }
 
     /**
@@ -95,10 +87,7 @@ public class ProgressDisplay {
     public static void warn(String message, Object... args) {
         System.out.println(ColorSupport.yellow("⚠") + " " + message.formatted(args));
 
-        // If logger is going to console, don't duplicate this message
-        if (!QilletniToolchainApplication.isVerbose()) {
-            LOGGER.warn(message);
-        }
+        getCallerLogger().warn(PRETTY_PRINTED, message.formatted(args));
     }
 
     /**

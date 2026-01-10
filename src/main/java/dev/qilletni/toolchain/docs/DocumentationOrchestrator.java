@@ -2,7 +2,7 @@ package dev.qilletni.toolchain.docs;
 
 import dev.qilletni.api.lib.qll.QllInfo;
 import dev.qilletni.docgen.DocGenerator;
-import dev.qilletni.toolchain.utils.ProgressDisplay;
+import dev.qilletni.toolchain.logging.ProgressDisplay;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

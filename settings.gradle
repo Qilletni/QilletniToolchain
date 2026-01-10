@@ -4,6 +4,9 @@ plugins {
 
 rootProject.name = 'QilletniToolchain'
 
+// Include the toolchain-logging subproject
+include 'toolchain-logging'
+
 develocity {
     buildScan {
         termsOfUseUrl = "https://gradle.com/terms-of-service"

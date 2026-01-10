@@ -12,7 +12,6 @@ import dev.qilletni.toolchain.qll.GradleProjectHelper;
 import dev.qilletni.toolchain.qll.LibraryValidator;
 import dev.qilletni.toolchain.qll.QllJarExtractor;
 import dev.qilletni.toolchain.qll.QllLoader;
-import dev.qilletni.toolchain.utils.ProgressDisplay;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -134,7 +133,7 @@ public class CommandRun implements Callable<Integer> {
                             }
 
                             if (Files.notExists(qllPath)) {
-                                ProgressDisplay.error("Unable to find package %s", resolvedPackage.name());
+                                LOGGER.error("Unable to find package {}", resolvedPackage.name());
                                 return;
                             }
 
@@ -154,7 +153,7 @@ public class CommandRun implements Callable<Integer> {
                             }
                 });
             } catch (IOException e) {
-                ProgressDisplay.error("An exception occurred while reading dependencies", e);
+                LOGGER.error("An exception occurred while reading dependencies", e);
             }
         }
 
@@ -162,7 +161,7 @@ public class CommandRun implements Callable<Integer> {
 
         var libraryValidator = new LibraryValidator(loadedLibraries);
         if (!libraryValidator.validate()) {
-            ProgressDisplay.error("Exiting due to unmet dependencies. Try deleting qilletni.lock and re-installing dependencies");
+            LOGGER.error("Exiting due to unmet dependencies. Try deleting qilletni.lock and re-installing dependencies");
             return 1;
         }
 
@@ -185,7 +184,7 @@ public class CommandRun implements Callable<Integer> {
                 LOGGER.debug("Running program: {}", file.getFileName());
                 runner.runProgram(file);
             } catch (QilletniException | IOException e) {
-                ProgressDisplay.error("An exception occurred while running %s", e, file.getFileName());
+                LOGGER.error("An exception occurred while running {}", file.getFileName(), e);
                 runner.shutdown();
                 return 1;
             }
