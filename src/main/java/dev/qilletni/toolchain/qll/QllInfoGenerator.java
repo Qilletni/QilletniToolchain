@@ -5,8 +5,8 @@ import com.google.gson.GsonBuilder;
 import dev.qilletni.api.lib.qll.ComparableVersion;
 import dev.qilletni.api.lib.qll.QllInfo;
 import dev.qilletni.api.lib.qll.Version;
-import dev.qilletni.pkgutil.adapters.ComparableVersionTypeAdapter;
-import dev.qilletni.pkgutil.adapters.VersionTypeAdapter;
+import dev.qilletni.api.lib.qll.adapters.ComparableVersionTypeAdapter;
+import dev.qilletni.api.lib.qll.adapters.VersionTypeAdapter;
 
 import java.io.IOException;
 import java.io.InputStream;

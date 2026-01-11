@@ -4,6 +4,8 @@ on:
   # Manual dispatch if dependencies need to be updated
   workflow_dispatch:
   push:
+    tags:
+      - 'v*.*.*'
     branches:
       - master
 
