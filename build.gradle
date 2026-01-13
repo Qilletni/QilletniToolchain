@@ -7,7 +7,7 @@ plugins {
 } 
 
 group = 'dev.qilletni.toolchain'
-version = '1.0.0'
+version = '1.0.1'
 
 sourceCompatibility = JavaVersion.VERSION_22
 targetCompatibility = JavaVersion.VERSION_22
@@ -29,7 +29,7 @@ dependencies {
     implementation 'info.picocli:picocli:4.7.5'
     annotationProcessor 'info.picocli:picocli-codegen:4.7.5'
 
-    implementation 'dev.qilletni.impl:qilletni:1.0.0'
+    implementation 'dev.qilletni.impl:qilletni:1.0.1'
 
     implementation 'dev.qilletni.api:qilletni-api:1.0.0'
     implementation 'dev.qilletni.pkgutil:qilletni-pkgutil:1.0.0'
