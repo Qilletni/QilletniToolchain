@@ -7,6 +7,17 @@ rootProject.name = 'QilletniToolchain'
 // Include the toolchain-logging subproject
 include 'toolchain-logging'
 
+// Include sibling Qilletni repo if present
+def coreDir = file('../Qilletni')
+if (coreDir.exists()) {
+    includeBuild(coreDir) {
+        dependencySubstitution {
+            substitute module('dev.qilletni.impl:qilletni') using project(':')
+            substitute module('dev.qilletni.api:qilletni-api') using project(':qilletni-api')
+        }
+    }
+}
+
 develocity {
     buildScan {
         termsOfUseUrl = "https://gradle.com/terms-of-service"
