@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'me.champeau.gradle.japicmp' version '0.4.6'
 }
 
 group = 'dev.qilletni.toolchain'
@@ -8,8 +9,21 @@ version = '1.0.0'
 sourceCompatibility = JavaVersion.VERSION_22
 targetCompatibility = JavaVersion.VERSION_22
 
+// See the root `build.gradle` for the rationale; regenerate together with
+// `./gradlew dependencies --write-locks` after a dependency change.
+dependencyLocking {
+    lockAllConfigurations()
+}
+
+// `mavenLocal()` is excluded from default release/CI dependency resolution - see
+// the root `build.gradle` and `-PuseMavenLocal=true`.
+def useMavenLocal = providers.gradleProperty('useMavenLocal').getOrElse('false').toBoolean()
+
 repositories {
-    mavenLocal()
+    if (useMavenLocal) {
+        mavenLocal()
+    }
+
     mavenCentral()
 
     maven {
@@ -23,7 +37,7 @@ dependencies {
     implementation 'org.apache.logging.log4j:log4j-core:2.25.3'
     annotationProcessor 'org.apache.logging.log4j:log4j-core:2.25.3'
 
-    implementation 'dev.qilletni.api:qilletni-api:1.0.0'
+    implementation "dev.qilletni.api:qilletni-api:${qilletniCoreVersion}"
 
     implementation 'org.slf4j:slf4j-api:2.0.16'
     implementation 'info.picocli:picocli:4.7.5'
@@ -32,4 +46,31 @@ dependencies {
 compileJava {
     options.compilerArgs << '-Alog4j.graalvm.groupId=dev.qilletni.toolchain'
     options.compilerArgs << '-Alog4j.graalvm.artifactId=toolchain-logging'
+}
+
+// Public API compatibility check for `toolchain-logging`'s exported classes, the one
+// meaningful japicmp target in this repository (it is the only module with a public
+// API consumed outside its own jar, embedded as-is into every release archive).
+// `-PjapicmpBaselineJar=/path/to/old-toolchain-logging.jar` points at a previously
+// published baseline jar; the task is skipped (never fabricating a baseline) when one
+// is not supplied - e.g. before this module has ever shipped its own comparable
+// standalone jar as a release asset (see `RELEASE.md` for the exact applicability
+// decision and its test).
+import me.champeau.gradle.japicmp.JapicmpTask
+
+def japicmpBaselineJar = findProperty('japicmpBaselineJar')
+
+tasks.register('japicmpCheck', JapicmpTask) {
+    description = 'Compares the current toolchain-logging public API against the published baseline jar'
+    onlyIf { japicmpBaselineJar != null }
+    if (japicmpBaselineJar != null) {
+        oldClasspath.from(files(japicmpBaselineJar))
+    }
+    newClasspath.from(tasks.named('jar').map { it.outputs.files })
+    dependsOn tasks.named('jar')
+    accessModifier = 'public'
+    onlyBinaryIncompatibleModified = false
+    failOnModification = false
+    ignoreMissingClasses = true
+    xmlOutputFile = file("${buildDir}/reports/japicmp/toolchain-logging.xml")
 }

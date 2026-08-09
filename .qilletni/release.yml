@@ -1,0 +1,47 @@
+# Release configuration for this repository, consumed by
+# `tools/release/src/release_config.ts` (checked out from
+# `Qilletni/Qilletni`) and the reusable release workflows. See
+# `Qilletni/Qilletni`'s `tools/release/README.md` for the full schema/CLI
+# contract, and this repository's `RELEASE.md` for the concrete pipeline.
+schema_version: 1
+repository: Qilletni/QilletniToolchain
+
+components:
+  # This CLI ships as a single executable archive, not a published Maven
+  # artifact - see `RELEASE.md` for the japicmp check this repository still
+  # runs against `toolchain-logging`'s embedded public API.
+  - name: qilletni-toolchain
+    kind: cli
+    version_file: gradle.properties
+    version_key: toolchainVersion
+    changelog: CHANGELOG.md
+
+# Every upstream component this CLI embeds and consumes as a published Maven
+# coordinate (see `release/components.yml` in `Qilletni/Qilletni`, which
+# registers this repository as a consumer of all three below).
+dependencies:
+  # Core (dev.qilletni.impl:qilletni) and API (dev.qilletni.api:qilletni-api)
+  # are one upstream release unit, released together at the same version -
+  # kept as a single 'dependencies' entry mapped to the one 'qilletniCoreVersion'
+  # property (see `gradle.properties`).
+  - upstream_component: qilletni-core
+    repository: Qilletni/Qilletni
+    coordinates:
+      - dev.qilletni.impl:qilletni
+      - dev.qilletni.api:qilletni-api
+    version_file: gradle.properties
+    version_key: qilletniCoreVersion
+
+  - upstream_component: qilletni-pkgutil
+    repository: Qilletni/QilletniPackageUtility
+    coordinates:
+      - dev.qilletni.pkgutil:qilletni-pkgutil
+    version_file: gradle.properties
+    version_key: qilletniPkgutilVersion
+
+  - upstream_component: qilletni-docgen
+    repository: Qilletni/QilletniDocgen
+    coordinates:
+      - dev.qilletni.docgen:qilletni-docgen
+    version_file: gradle.properties
+    version_key: qilletniDocgenVersion

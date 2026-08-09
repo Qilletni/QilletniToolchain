@@ -2,7 +2,7 @@
 # download_latest_toolchain.sh
 #
 # This script downloads the latest release .jar from the GitHub repository
-# RubbaBoy/QilletniToolchain and saves it to the path specified as the sole argument.
+# Qilletni/QilletniToolchain and saves it to the path specified as the sole argument.
 #
 # It first tries to use the /releases/latest endpoint. If that fails (404),
 # it falls back to listing all releases and picking the first one.
@@ -25,7 +25,7 @@ fi
 DOWNLOAD_PATH="$1"
 
 # Repository details.
-REPO_OWNER="RubbaBoy"
+REPO_OWNER="Qilletni"
 REPO_NAME="QilletniToolchain"
 
 # Optionally, if you have a GitHub token set in the environment, use it:

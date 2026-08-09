@@ -7,13 +7,39 @@ rootProject.name = 'QilletniToolchain'
 // Include the toolchain-logging subproject
 include 'toolchain-logging'
 
-// Include sibling Qilletni repo if present
-def coreDir = file('../Qilletni')
-if (coreDir.exists()) {
-    includeBuild(coreDir) {
-        dependencySubstitution {
-            substitute module('dev.qilletni.impl:qilletni') using project(':')
-            substitute module('dev.qilletni.api:qilletni-api') using project(':qilletni-api')
+// Sibling composite-build substitution is opt-in only - it is never enabled
+// implicitly just because a sibling checkout directory happens to exist.
+// Pass `-PincludeSiblingBuilds=true` for local multi-repo development.
+// Stable CI/release builds always force this off (see `gradle.properties`
+// and `RELEASE.md`).
+def includeSiblingBuilds = providers.gradleProperty('includeSiblingBuilds').getOrElse('false').toBoolean()
+
+if (includeSiblingBuilds) {
+    def coreDir = file('../Qilletni')
+    if (coreDir.exists()) {
+        includeBuild(coreDir) {
+            dependencySubstitution {
+                substitute module('dev.qilletni.impl:qilletni') using project(':')
+                substitute module('dev.qilletni.api:qilletni-api') using project(':qilletni-api')
+            }
+        }
+    }
+
+    def pkgUtilDir = file('../QilletniPackageUtility')
+    if (pkgUtilDir.exists()) {
+        includeBuild(pkgUtilDir) {
+            dependencySubstitution {
+                substitute module('dev.qilletni.pkgutil:qilletni-pkgutil') using project(':')
+            }
+        }
+    }
+
+    def docgenDir = file('../QilletniDocgen')
+    if (docgenDir.exists()) {
+        includeBuild(docgenDir) {
+            dependencySubstitution {
+                substitute module('dev.qilletni.docgen:qilletni-docgen') using project(':')
+            }
         }
     }
 }

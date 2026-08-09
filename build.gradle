@@ -4,10 +4,11 @@ plugins {
     id 'application'
     id 'maven-publish'
     id 'com.github.johnrengelman.shadow' version '8.1.1'
-} 
+    id 'org.cyclonedx.bom' version '3.2.4'
+}
 
 group = 'dev.qilletni.toolchain'
-version = '1.0.2-SNAPSHOT'
+version = toolchainVersion
 
 sourceCompatibility = JavaVersion.VERSION_22
 targetCompatibility = JavaVersion.VERSION_22
@@ -16,8 +17,23 @@ application {
     mainClass = 'dev.qilletni.toolchain.QilletniToolchainApplication'
 }
 
+// Locks the resolved dependency graph for the configurations used to build the
+// release archive, so a published version is always built from an exact,
+// checked-in set of resolved coordinates (gradle.lockfile). Regenerate with
+// `./gradlew dependencies --write-locks` after a dependency change.
+dependencyLocking {
+    lockAllConfigurations()
+}
+
+// `mavenLocal()` is excluded from default release/CI dependency resolution.
+// Enable with `-PuseMavenLocal=true`.
+def useMavenLocal = providers.gradleProperty('useMavenLocal').getOrElse('false').toBoolean()
+
 repositories {
-    mavenLocal()
+    if (useMavenLocal) {
+        mavenLocal()
+    }
+
     mavenCentral()
 
     maven {
@@ -26,14 +42,17 @@ repositories {
 }
 
 dependencies {
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
     implementation 'info.picocli:picocli:4.7.5'
     annotationProcessor 'info.picocli:picocli-codegen:4.7.5'
 
-    implementation 'dev.qilletni.impl:qilletni:1.0.1'
-
-    implementation 'dev.qilletni.api:qilletni-api:1.0.0'
-    implementation 'dev.qilletni.pkgutil:qilletni-pkgutil:1.0.0'
-    implementation 'dev.qilletni.docgen:qilletni-docgen:1.0.0'
+    implementation "dev.qilletni.impl:qilletni:${qilletniCoreVersion}"
+    implementation "dev.qilletni.api:qilletni-api:${qilletniCoreVersion}"
+    implementation "dev.qilletni.pkgutil:qilletni-pkgutil:${qilletniPkgutilVersion}"
+    implementation "dev.qilletni.docgen:qilletni-docgen:${qilletniDocgenVersion}"
 
     // Configs
     implementation 'org.yaml:snakeyaml:2.2'
@@ -69,6 +88,112 @@ idea {
     module {
         downloadJavadoc = true // defaults to false
         downloadSources = true
+    }
+}
+
+// Best-effort source commit, embedded in the version-info resource and the
+// component manifest below. Falls back to 'unknown' when git is unavailable
+// (e.g. a source archive build), never failing the build.
+def sourceCommit = providers.exec {
+    commandLine 'git', 'rev-parse', 'HEAD'
+    ignoreExitValue = true
+}.standardOutput.asText.map { it.trim() }.orElse('unknown').map { it.isEmpty() ? 'unknown' : it }
+
+def generatedResourcesDir = layout.buildDirectory.dir('generated/version-info')
+
+// Generates the runtime-embedded version resource read by `qilletni --version`
+// (see `VersionProvider`), recording this CLI's own version alongside the
+// exact upstream `qilletni-core`/`qilletni-pkgutil`/`qilletni-docgen` versions
+// it was built against, and the source commit.
+tasks.register('generateVersionInfo') {
+    def outputDir = generatedResourcesDir
+    inputs.property('toolchainVersion', toolchainVersion)
+    inputs.property('qilletniCoreVersion', qilletniCoreVersion)
+    inputs.property('qilletniPkgutilVersion', qilletniPkgutilVersion)
+    inputs.property('qilletniDocgenVersion', qilletniDocgenVersion)
+    outputs.dir(outputDir)
+    doLast {
+        def commit = sourceCommit.get()
+        def file = outputDir.get().file('dev/qilletni/toolchain/version.properties').asFile
+        file.parentFile.mkdirs()
+        file.text = """\
+            |toolchain.version=${toolchainVersion}
+            |qilletni.core.version=${qilletniCoreVersion}
+            |qilletni.api.version=${qilletniCoreVersion}
+            |qilletni.pkgutil.version=${qilletniPkgutilVersion}
+            |qilletni.docgen.version=${qilletniDocgenVersion}
+            |commit=${commit}
+            |""".stripMargin()
+    }
+}
+
+sourceSets.main.resources.srcDir(generatedResourcesDir)
+tasks.named('processResources') {
+    dependsOn tasks.named('generateVersionInfo')
+}
+
+// Component manifest embedded in every CLI archive (see `release.yml`), and
+// attached as its own GitHub release asset: this CLI's own version, the exact
+// embedded upstream versions it was built against, and the source commit -
+// matching the `embeds` shape the central `release/platform/candidates.yml`
+// tooling expects (`core`, `api`, `pkgutil`, `docgen`).
+tasks.register('generateComponentManifest') {
+    def outputFile = layout.buildDirectory.file('component-manifest.json')
+    inputs.property('toolchainVersion', toolchainVersion)
+    inputs.property('qilletniCoreVersion', qilletniCoreVersion)
+    inputs.property('qilletniPkgutilVersion', qilletniPkgutilVersion)
+    inputs.property('qilletniDocgenVersion', qilletniDocgenVersion)
+    outputs.file(outputFile)
+    doLast {
+        def commit = sourceCommit.get()
+        def json = groovy.json.JsonOutput.toJson([
+            schema_version: 1,
+            component      : 'qilletni-toolchain',
+            version        : toolchainVersion,
+            commit         : commit,
+            embeds         : [
+                core   : qilletniCoreVersion,
+                api    : qilletniCoreVersion,
+                pkgutil: qilletniPkgutilVersion,
+                docgen : qilletniDocgenVersion,
+            ],
+        ])
+        def file = outputFile.get().asFile
+        file.parentFile.mkdirs()
+        file.text = groovy.json.JsonOutput.prettyPrint(json) + '\n'
+    }
+}
+
+// CycloneDX JSON SBOM, attached as a release asset by the publish workflow.
+// Output: build/reports/cyclonedx-direct/bom.json
+cyclonedxDirectBom {
+    includeConfigs = ['runtimeClasspath']
+}
+
+// Guards a stable release publication from ever resolving a SNAPSHOT or
+// dynamic-version dependency, run by release.yml before publishing a tag.
+// Only considers actual external module dependencies (not project(':...')
+// dependencies within this multi-module build).
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+
+tasks.register('checkNoSnapshotDependencies') {
+    description = 'Fails if the resolved runtime/compile classpath contains a SNAPSHOT or dynamic external dependency version'
+    doLast {
+        def offenders = []
+        ['runtimeClasspath', 'compileClasspath'].each { configName ->
+            configurations.getByName(configName).incoming.resolutionResult.allComponents.each { component ->
+                def id = component.id
+                if (id instanceof ModuleComponentIdentifier) {
+                    def version = id.version
+                    if (version.contains('SNAPSHOT') || version.contains('+') || version.startsWith('latest.')) {
+                        offenders << "${configName}: ${id.group}:${id.module}:${version}".toString()
+                    }
+                }
+            }
+        }
+        if (offenders) {
+            throw new GradleException("A stable release must not resolve SNAPSHOT/dynamic dependencies:\n" + offenders.join('\n'))
+        }
     }
 }
 

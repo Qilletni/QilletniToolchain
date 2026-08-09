@@ -1,0 +1,70 @@
+name: PR CI
+
+# Verifies every pull request against this repository - normal change PRs,
+# the automated `dependency-update` PRs (opened by `reusable-dependency-update.yml`)
+# and the automated `release` PRs (opened by `reusable-release-prepare.yml`) alike -
+# all go through the exact same build/test/guard gate before they can be merged.
+
+on:
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    if: github.repository == 'Qilletni/QilletniToolchain'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: '22'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Build and test (sibling composite builds explicitly disabled)
+        run: ./gradlew clean build -PincludeSiblingBuilds=false
+
+      - name: Ensure the resolved dependency graph has no SNAPSHOT/dynamic dependencies
+        run: ./gradlew checkNoSnapshotDependencies -PincludeSiblingBuilds=false
+
+      - uses: actions/checkout@v6
+        with:
+          repository: Qilletni/Qilletni
+          path: .qilletni-release-tooling
+          sparse-checkout: tools/release
+          submodules: true  # tools/release submodule (Qilletni/ReleaseTooling)
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: .qilletni-release-tooling/tools/release/package-lock.json
+
+      - name: Install release tooling dependencies
+        working-directory: .qilletni-release-tooling/tools/release
+        run: npm ci
+
+      - name: Validate release configuration
+        working-directory: .qilletni-release-tooling/tools/release
+        run: |
+          node --import tsx src/cli.ts validate-release-config --config "$GITHUB_WORKSPACE/.qilletni/release.yml"
+
+      - name: Validate the release marker, when this is an automated release PR
+        if: contains(github.event.pull_request.labels.*.name, 'release')
+        working-directory: .qilletni-release-tooling/tools/release
+        run: |
+          if [[ -f "$GITHUB_WORKSPACE/release/pending-release.json" ]]; then
+            VERSION=$(node --import tsx src/cli.ts get-property --file "$GITHUB_WORKSPACE/gradle.properties" --key toolchainVersion)
+            node --import tsx src/cli.ts check-release-marker \
+              --marker "$GITHUB_WORKSPACE/release/pending-release.json" \
+              --expected-component qilletni-toolchain \
+              --expected-version "$VERSION"
+          fi

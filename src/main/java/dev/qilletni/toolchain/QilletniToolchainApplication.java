@@ -14,7 +14,7 @@ import picocli.CommandLine;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-@CommandLine.Command(name = "qilletni", version = "v1.0.0-SNAPSHOT", subcommands = {CommandRun.class, CommandBuild.class, CommandDoc.class, CommandInit.class, CommandPersist.class})
+@CommandLine.Command(name = "qilletni", versionProvider = VersionProvider.class, subcommands = {CommandRun.class, CommandBuild.class, CommandDoc.class, CommandInit.class, CommandPersist.class})
 public class QilletniToolchainApplication {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(QilletniToolchainApplication.class);

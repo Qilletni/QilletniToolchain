@@ -1,0 +1,31 @@
+# Local caller workflow for receiving dependency-dispatch notifications for
+# any of the upstream components declared in this repository's own
+# `.qilletni/release.yml` 'dependencies' mapping (qilletni-core,
+# qilletni-pkgutil, qilletni-docgen). All actual validation/verification/
+# update logic lives centrally in `reusable-dependency-update.yml`
+# (Qilletni/Qilletni); this file only receives the event and forwards it
+# with this repository's own App credentials.
+#
+# See `tools/release/examples/dependency-update.yml` and
+# `tools/release/README.md` in Qilletni/Qilletni for the full contract.
+# This never auto-merges - it only opens a review-only PR.
+
+name: Dependency Update
+
+on:
+  repository_dispatch:
+    types: [qilletni-dependency-release]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  update-dependency:
+    if: github.repository == 'Qilletni/QilletniToolchain'
+    uses: Qilletni/Qilletni/.github/workflows/reusable-dependency-update.yml@master
+    with:
+      payload: ${{ toJson(github.event.client_payload) }}
+    secrets:
+      app-id: ${{ secrets.QILLETNI_RELEASE_APP_ID }}
+      app-private-key: ${{ secrets.QILLETNI_RELEASE_APP_PRIVATE_KEY }}
