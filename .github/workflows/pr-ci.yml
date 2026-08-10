@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'Qilletni/QilletniToolchain'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up JDK
         uses: actions/setup-java@v5
@@ -35,16 +35,16 @@ jobs:
       - name: Ensure the resolved dependency graph has no SNAPSHOT/dynamic dependencies
         run: ./gradlew checkNoSnapshotDependencies -PincludeSiblingBuilds=false
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: Qilletni/Qilletni
           path: .qilletni-release-tooling
           sparse-checkout: tools/release
           submodules: true  # tools/release submodule (Qilletni/ReleaseTooling)
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: .qilletni-release-tooling/tools/release/package-lock.json
 

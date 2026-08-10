@@ -40,20 +40,20 @@ jobs:
     outputs:
       is_release_merge: ${{ steps.detect.outputs.is_release_merge }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: Qilletni/Qilletni
           path: .qilletni-release-tooling
           sparse-checkout: tools/release
           submodules: true  # tools/release submodule (Qilletni/ReleaseTooling)
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: .qilletni-release-tooling/tools/release/package-lock.json
 
@@ -134,7 +134,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up JDK
         uses: actions/setup-java@v5
@@ -216,7 +216,7 @@ jobs:
       archive_name: qilletni-${{ steps.check.outputs.version }}.tar.gz
       archive_sha256: ${{ steps.hashes.outputs.archive_sha256 }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -229,16 +229,16 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: Qilletni/Qilletni
           path: .qilletni-release-tooling
           sparse-checkout: tools/release
           submodules: true  # tools/release submodule (Qilletni/ReleaseTooling)
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: .qilletni-release-tooling/tools/release/package-lock.json
 
@@ -396,21 +396,21 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'Qilletni/QilletniToolchain'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: Qilletni/Qilletni
           path: .qilletni-release-tooling
           sparse-checkout: tools/release
           submodules: true  # tools/release submodule (Qilletni/ReleaseTooling)
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           path: toolchain
           sparse-checkout: gradle.properties
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: .qilletni-release-tooling/tools/release/package-lock.json
 
