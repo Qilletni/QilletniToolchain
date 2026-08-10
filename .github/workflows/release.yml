@@ -145,10 +145,19 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
+      - name: Warm the Gradle wrapper
+        run: ./gradlew --version
+
       - name: Check this is a SNAPSHOT version
         id: check
         run: |
-          TOOLCHAIN_VERSION=$(./gradlew printVersion -q -PincludeSiblingBuilds=false)
+          TOOLCHAIN_VERSION=$(./gradlew printVersion -q -PincludeSiblingBuilds=false | tail -n1 | tr -d '\r')
+  
+          if [[ ! "$TOOLCHAIN_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?$ ]]; then
+          echo "::error::Unexpected version output from Gradle: '$TOOLCHAIN_VERSION'"
+            exit 1
+          fi
+          
           echo "toolchain version: $TOOLCHAIN_VERSION"
 
           if [[ ! "$TOOLCHAIN_VERSION" =~ -SNAPSHOT$ ]]; then
