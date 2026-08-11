@@ -197,6 +197,31 @@ jobs:
           git tag -f snapshot
           git push origin --force refs/tags/snapshot
 
+      # Snapshot version bumps leave stale artifacts with old version names,
+      # so this removes them before updating.
+      - name: Prune superseded snapshot archives
+        if: steps.check.outputs.is_snapshot == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          CURRENT="qilletni-${{ steps.check.outputs.version }}.tar.gz"
+
+          EXISTING=$(gh release view snapshot --json assets -q '.assets[].name' 2>/dev/null || true)
+          STALE=$(grep -E '^qilletni-.*\.tar\.gz$' <<< "${EXISTING:-}" | grep -vFx "$CURRENT" || true)
+
+          if [[ -z "$STALE" ]]; then
+            echo "No superseded snapshot archives to prune."
+            exit 0
+          fi
+
+          while read -r name; do
+            [[ -n "$name" ]] || continue
+            echo "Deleting superseded snapshot archive: $name"
+            gh release delete-asset snapshot "$name" --yes
+          done <<< "$STALE"
+
       - name: Create snapshot release
         if: steps.check.outputs.is_snapshot == 'true'
         uses: softprops/action-gh-release@v2
