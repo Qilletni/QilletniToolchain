@@ -25,6 +25,18 @@ if [ "$debug_mode" = true ]; then
   java_opts+=("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005")
 fi
 
+# Prefer JAVA_HOME, fall back to PATH. Kept in sync with the installer's
+# preflight check (install/install.sh in Qilletni/Qilletni).
+if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+  JAVA="$JAVA_HOME/bin/java"
+elif command -v java > /dev/null 2>&1; then
+  JAVA=java
+else
+  echo "qilletni: no Java runtime found. Qilletni needs Java 22 or newer;" >&2
+  echo "install a JDK (https://adoptium.net) or set JAVA_HOME." >&2
+  exit 1
+fi
+
 # Construct and run the java command
 # First, any -D options, then -jar, then the jar path, finally other args
-java "${java_opts[@]}" -jar "$JAR_PATH" "${other_args[@]}"
+"$JAVA" "${java_opts[@]}" -jar "$JAR_PATH" "${other_args[@]}"

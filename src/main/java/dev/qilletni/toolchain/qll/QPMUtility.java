@@ -21,12 +21,8 @@ public class QPMUtility {
 
     private static Path getQPMBinary() {
         var qpmPath = Objects.requireNonNullElse(System.getenv("QPM_PATH"), Paths.get(System.getProperty("user.home"), ".qilletni", "bin").toAbsolutePath().toString());
-        var qilletniDir = Paths.get(qpmPath);
 
-        // Determine whether to use gradlew or gradlew.bat based on OS
-        return System.getProperty("os.name").toLowerCase().contains("win")
-                ? qilletniDir.resolve("qpm.bat")
-                : qilletniDir.resolve("qpm");
+        return Paths.get(qpmPath).resolve("qpm");
     }
 
     /**

@@ -180,7 +180,6 @@ jobs:
             --transform 's|.*/||' \
             build/libs/QilletniToolchain.jar \
             build/component-manifest.json \
-            scripts/qilletni.bat \
             scripts/qilletni
 
       - name: Extract release notes
@@ -389,7 +388,6 @@ jobs:
             --transform 's|.*/||' \
             build/libs/QilletniToolchain.jar \
             build/component-manifest.json \
-            scripts/qilletni.bat \
             scripts/qilletni
 
           TOOLCHAIN_LOGGING_JAR=$(ls toolchain-logging/build/libs/toolchain-logging-*.jar | head -n1)
