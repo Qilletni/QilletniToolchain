@@ -1,143 +1,146 @@
-## QilletniToolchain Release Protocol
+# QilletniToolchain Release Protocol
 
-This repository is one of the five onboarded release producers in the wider Qilletni
-ecosystem (**Qilletni**, **QilletniToolchain**, **QPMCLI**, **QilletniPackageUtility**,
-**QilletniDocgen**). It declares its own `.qilletni/release.yml`
-(schema/validation in `Qilletni/Qilletni`'s `tools/release/src/release_config.ts`).
-The central, reusable release-preparation/dependency-update logic lives in
-`Qilletni/Qilletni` (`.github/workflows/reusable-*.yml`); this repository's own
-`.github/workflows/` files are thin local callers of it. See `Qilletni/Qilletni`'s own
-`RELEASE.md` and `tools/release/README.md` for the full cross-repository contract.
+QilletniToolchain is a producer repository in the Qilletni release process. The shared
+procedure is in the [Qilletni release document][main]. This document gives only the facts
+for this repository.
 
-Unlike `Qilletni`, `QPMCLI` or `QilletniPackageUtility`/`QilletniDocgen`, this CLI is not
-published to Maven Central. It publishes a single executable archive (and the shadowed
-jar) as a GitHub Release asset, registered as `qilletni-toolchain` (`kind: cli`) in
-`.qilletni/release.yml`.
+## This repository
 
-### Version centralization
+| Item | Value |
+| --- | --- |
+| Component | `qilletni-toolchain` |
+| Kind | `cli` |
+| Version | `toolchainVersion` in `gradle.properties` |
+| Publishes to | a GitHub release. This repository publishes nothing to Maven Central. |
+| Release assets | `qilletni-X.Y.Z.tar.gz`, `QilletniToolchain.jar`, `toolchain-logging-X.Y.Z.jar`, `component-manifest.json`, `bom.json` |
+| Snapshots | the `snapshot` GitHub prerelease, replaced for each push to `master` |
+| Jobs in `release.yml` | `tag-release`, `publish-snapshot`, `build-and-publish`, `platform-dispatch`, `snapshot-followup` |
+| Lockfiles | `gradle.lockfile`, `toolchain-logging/gradle.lockfile` |
+| Pull request checks | `pr-ci.yml` |
 
-This CLI's own version (`toolchainVersion`) and the exact pinned versions of every
-upstream Maven dependency it embeds are all declared once in `gradle.properties`:
+## Overview
 
-- `toolchainVersion` - this repository's own release unit.
-- `qilletniCoreVersion` - aligns `dev.qilletni.impl:qilletni` (core) and
-  `dev.qilletni.api:qilletni-api` (API) as **one** upstream release unit (they are always
-  released together upstream, at the same version, as `qilletni-core`), so a single
-  property bumps both coordinates atomically.
-- `qilletniPkgutilVersion` - `dev.qilletni.pkgutil:qilletni-pkgutil`.
-- `qilletniDocgenVersion` - `dev.qilletni.docgen:qilletni-docgen`.
+```mermaid
+flowchart TD
+    U1["qilletni-core release"] --> D["Open a dependency PR"]
+    U2["qilletni-pkgutil release"] --> D
+    U3["qilletni-docgen release"] --> D
+    D --> M1{{"Manual: merge the dependency PR"}}
+    M1 -->|if a release is necessary| P{{"Manual: run Release - Prepare"}}
+    P --> M2{{"Manual: merge the release PR"}}
+    M2 --> R["Publish the GitHub release"]
+    R --> S{{"Manual: merge the snapshot PR"}}
+    R --> C["Send a platform candidate"]
+```
 
-`includeSiblingBuilds` (default `false`) and `useMavenLocal` (default `false`) are both
-opt-in only, for local multi-repo development against sibling checkouts (`../Qilletni`,
-`../QilletniPackageUtility`, `../QilletniDocgen`) or a locally-published artifact. Every
-CI/release workflow in this repository always passes `-PincludeSiblingBuilds=false`
-explicitly, regardless of the default.
+- A hexagon with "Manual:" is a step that the maintainer does.
+- A rectangle is a step that a workflow does.
 
-### Preparing a release
+## Prepare and publish a release
 
-1. Run the `Release - Prepare` workflow (`workflow_dispatch`), choosing a
-   `patch`/`minor`/`major` bump.
-2. It calls `Qilletni/Qilletni/.github/workflows/reusable-release-prepare.yml@master`,
-   which computes the next version from the latest stable `vX.Y.Z` tag, requires a
-   non-empty `## [Unreleased]` section in `CHANGELOG.md` (and, for a `major` bump, a
-   `docs/migrations/X.Y.Z.md` guide - see `docs/migrations/README.md`), runs
-   `./gradlew clean test`, updates `toolchainVersion`, promotes the changelog, writes a
-   `release/pending-release.json` marker, and opens a signed, review-only PR.
-3. **This PR never auto-merges.**
+1. Write the changes in the `## [Unreleased]` section of `CHANGELOG.md`. For a major bump,
+   also write `docs/migrations/X.Y.Z.md`. **(manual)**
+2. Run the `Release - Prepare` workflow. Select the bump. **(manual)**
+   Refer to [Prepare a release][prepare].
+3. Examine the release PR, then merge it. **(manual)**
+4. The `tag-release` job creates the tag. The `build-and-publish` job creates the GitHub
+   release. Refer to [Publish a release][publish].
 
-### Publishing a release (fully automatic after merge)
+<details>
+    <summary>What does this do?</summary>
 
-`release.yml` reacts to `master` pushes and to `vX.Y.Z` tag pushes:
+The `build-and-publish` job in this repository is different from the job in Qilletni:
 
-- **`tag-release`** (every push to `master`): if `toolchainVersion` is still a
-  `-SNAPSHOT`, nothing happens. Otherwise, `release/pending-release.json` is required and
-  validated, the merge commit's originating PR is checked (`check-merge-provenance`), and
-  the immutable `vX.Y.Z` tag is **idempotently** created at that exact commit - no
-  maintainer ever has to push a tag by hand. A direct tag push remains supported only as a
-  manual recovery path, and is likewise idempotent.
-- **`publish-snapshot`** (every push to `master`, isolated from the tag-triggered path):
-  publishes the executable archive as the floating `snapshot` GitHub prerelease whenever
-  the version is still a `-SNAPSHOT`.
-- **`build-and-publish`** (triggered only by the `vX.Y.Z` tag push, inside the protected
-  `production-release` GitHub Environment):
-  1. Validates the tag matches `toolchainVersion` and that the resolved dependency graph
-     has no SNAPSHOT/dynamic versions (`checkNoSnapshotDependencies`).
-  2. Determines the previous released version from this repository's own GitHub tags
-     (there is no Maven registry to query), and resolves whether a comparable, previously
-     published `toolchain-logging-X.Y.Z.jar` baseline asset exists (the release
-     CLI's `resolve-japicmp-baseline`, in `Qilletni/Qilletni`'s `tools/release`)
-     - **never fabricating one**. The very
-     first release under this scheme has no baseline yet, so japicmp is skipped for it;
-     every release publishes its own `toolchain-logging-X.Y.Z.jar` asset so the *next*
-     release has one.
-  3. When a baseline exists, runs `toolchain-logging`'s japicmp check and enforces the
-     patch/minor/major policy (preferring the release marker's recorded bump kind), same
-     rules as `Qilletni/Qilletni`:
-     - **patch**: rejects *any* additive or breaking public API change.
-     - **minor**: rejects breaking changes; additive changes are allowed.
-     - **major**: breaking changes are allowed only if `docs/migrations/X.Y.Z.md` exists.
-  4. Builds the shadowed CLI jar, the `toolchain-logging` jar, a CycloneDX JSON SBOM, and
-     `component-manifest.json` (this CLI's own version, the exact embedded
-     `qilletni-core`/`qilletni-api`/`qilletni-pkgutil`/`qilletni-docgen` versions, and the
-     source commit - see the `generateComponentManifest` Gradle task). The manifest is
-     packaged **inside** the release archive as well as attached as its own asset.
-  5. Packages `qilletni-X.Y.Z.tar.gz` (jar + `component-manifest.json` + launcher scripts),
-     computes its SHA-256, and creates the GitHub Release with the archive, the shadowed
-     jar, the `toolchain-logging` jar, the SBOM and the component manifest all attached as
-     assets.
-- **`platform-dispatch`** (after `build-and-publish`): builds the exact
-  `qilletni-platform-component-release` payload documented centrally (this repository,
-  version/tag/full commit/archive name + SHA-256, and every embedded dependency version),
-  live-re-verifies it against the just-published GitHub release
-  (`verify-release-event-provenance`), mints a GitHub App token scoped to **only**
-  `Qilletni/Qilletni` (never this repository's own token, never an org-wide token), and
-  dispatches a `qilletni-platform-component-release` `repository_dispatch` event to it, so
-  a reviewed platform-candidate PR is opened centrally.
-- **`snapshot-followup`** (after `platform-dispatch`): opens a follow-up PR bumping
-  `toolchainVersion` to `X.Y.(Z+1)-SNAPSHOT` and removing the consumed release marker, via
-  `Qilletni/Qilletni/.github/workflows/reusable-snapshot-followup.yml@master`. Never
-  auto-merges.
+- It gets the last release version from the tags of this repository, because there is no
+  Maven registry.
+- It runs the japicmp gate only for `toolchain-logging`. For more data, refer to
+  [Select the bump](#select-the-bump).
+- It makes `component-manifest.json`. The manifest records this version, the versions of
+  the embedded components and the source commit. The archive contains the manifest, and
+  the release also attaches it as an asset.
+- It makes `qilletni-X.Y.Z.tar.gz`. The archive contains the jar, the manifest and the
+  launcher scripts.
 
-`qilletni --version` reports this CLI's own version alongside the exact embedded
-`qilletni-core`/`qilletni-api`/`qilletni-pkgutil`/`qilletni-docgen` versions and the
-source commit, read from the `version.properties` resource generated by the
-`generateVersionInfo` Gradle task at build time (see `VersionProvider`).
+`qilletni --version` shows this version, the embedded component versions and the source
+commit.
 
-### Consuming upstream dependency updates
+</details>
 
-`dependency-update.yml` receives a `repository_dispatch` event named
-`qilletni-dependency-release` (sent by whichever upstream producer just released
-`qilletni-core`, `qilletni-pkgutil` or `qilletni-docgen`) and forwards it, with this
-repository's own App credentials, to
-`Qilletni/Qilletni/.github/workflows/reusable-dependency-update.yml@master`, which
-validates the payload against the `dependencies` mapping in `.qilletni/release.yml`,
-re-verifies every artifact live against Maven Central, updates only the matching
-`gradle.properties` key, refreshes Gradle dependency locks (`gradle.lockfile`,
-`toolchain-logging/gradle.lockfile`) with sibling composite builds explicitly disabled,
-runs the full test suite and `checkNoSnapshotDependencies`, confirms the resolved
-dependency graph really contains the requested version, and opens a signed,
-**never-auto-merging** PR.
+5. The `platform-dispatch` job sends a platform candidate to Qilletni. Merge the candidate
+   PR in Qilletni. **(manual)** Refer to [Release the platform][platform].
+6. The `snapshot-followup` job opens the snapshot PR. Merge it. **(manual)**
 
-### Authentication
+No repository consumes `qilletni-toolchain` as a dependency. A release of this repository
+opens no dependency PR.
 
-Cross-repository dispatch and every PR this automation opens authenticate as a GitHub App
-(organization secrets `QILLETNI_RELEASE_APP_ID` / `QILLETNI_RELEASE_APP_PRIVATE_KEY`) via
-`actions/create-github-app-token@v3`, each token scoped to exactly one target repository -
-never a broad, org-wide token.
+### Select the bump
 
-### Dependency locking
+The japicmp gate examines only the public API of `toolchain-logging`.
 
-`gradle.lockfile` and `toolchain-logging/gradle.lockfile` pin the exact resolved
-dependency graph used to build a release. Regenerate both after a dependency change:
+| Bump | The japicmp gate stops the release if |
+| --- | --- |
+| `patch` | the `toolchain-logging` API has a change of any type |
+| `minor` | the `toolchain-logging` API has an incompatible change |
+| `major` | the `toolchain-logging` API has an incompatible change and `docs/migrations/X.Y.Z.md` does not exist |
+
+<details>
+    <summary>What does this do?</summary>
+
+- The gate compares with `toolchain-logging-X.Y.Z.jar` from the last GitHub release of
+  this repository.
+- Each release attaches this jar, so that the next release has a baseline.
+- If no earlier release has the jar, the gate does not run. The job never makes a baseline.
+
+</details>
+
+## Consume upstream releases
+
+This repository consumes three upstream components.
+
+| Upstream component | Producer repository | Version key | Coordinates |
+| --- | --- | --- | --- |
+| `qilletni-core` | Qilletni | `qilletniCoreVersion` | `dev.qilletni.impl:qilletni`, `dev.qilletni.api:qilletni-api` |
+| `qilletni-pkgutil` | QilletniPackageUtility | `qilletniPkgutilVersion` | `dev.qilletni.pkgutil:qilletni-pkgutil` |
+| `qilletni-docgen` | QilletniDocgen | `qilletniDocgenVersion` | `dev.qilletni.docgen:qilletni-docgen` |
+
+The two `qilletni-core` coordinates use one version key, because Qilletni releases them
+together.
+
+1. The `Dependency Update` workflow opens a dependency PR for each upstream release.
+   Refer to [Update the consumer repositories][consumers].
+2. Examine the dependency PR, then merge it. **(manual)**
+3. Decide if this repository needs a release. If yes, do
+   [Prepare and publish a release](#prepare-and-publish-a-release). **(manual)**
+
+## Dependency locks
+
+The two lockfiles record the exact dependency graph of a release. After a dependency
+change, refresh both lockfiles:
 
 ```bash
 ./gradlew dependencies --write-locks -PincludeSiblingBuilds=false
 ./gradlew :toolchain-logging:dependencies --write-locks -PincludeSiblingBuilds=false
 ```
 
-### PR verification
+The `Dependency Update` workflow refreshes both lockfiles automatically.
 
-`pr-ci.yml` runs `./gradlew clean build checkNoSnapshotDependencies` (sibling composite
-builds explicitly disabled) and validates `.qilletni/release.yml` against every pull
-request opened on this repository - ordinary change PRs, automated `dependency-update`
-PRs and automated `release` PRs alike.
+## Local development
+
+- `-PincludeSiblingBuilds=true` builds against the sibling checkouts `../Qilletni`,
+  `../QilletniPackageUtility` and `../QilletniDocgen`.
+- `-PuseMavenLocal=true` builds against artifacts in the local Maven repository.
+
+Both flags are `false` by default. The release workflows and the `pr-ci.yml` workflow
+always set `-PincludeSiblingBuilds=false`.
+
+## Links
+
+- [Qilletni release document][main]
+- [`release/components.yml`](https://github.com/Qilletni/Qilletni/blob/master/release/components.yml)
+- [`tools/release/README.md`](https://github.com/Qilletni/ReleaseTooling/blob/master/README.md)
+
+[main]: https://github.com/Qilletni/Qilletni/blob/master/RELEASE.md
+[prepare]: https://github.com/Qilletni/Qilletni/blob/master/RELEASE.md#prepare-a-release
+[publish]: https://github.com/Qilletni/Qilletni/blob/master/RELEASE.md#publish-a-release
+[consumers]: https://github.com/Qilletni/Qilletni/blob/master/RELEASE.md#update-the-consumer-repositories
+[platform]: https://github.com/Qilletni/Qilletni/blob/master/RELEASE.md#release-the-platform
