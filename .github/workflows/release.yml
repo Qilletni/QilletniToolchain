@@ -312,10 +312,19 @@ jobs:
         run: |
           node --import tsx src/cli.ts validate-release-config --config "$GITHUB_WORKSPACE/.qilletni/release.yml"
 
+      - name: Warm the Gradle wrapper
+        run: ./gradlew --version
+
       - name: Check the tag matches toolchainVersion
         id: check
         run: |
-          TOOLCHAIN_VERSION=$(./gradlew printVersion -q -PincludeSiblingBuilds=false)
+          TOOLCHAIN_VERSION=$(./gradlew printVersion -q -PincludeSiblingBuilds=false | tail -n1 | tr -d '\r')
+
+          if [[ ! "$TOOLCHAIN_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?$ ]]; then
+            echo "::error::Unexpected version output from Gradle: '$TOOLCHAIN_VERSION'"
+            exit 1
+          fi
+
           echo "qilletni-toolchain version: $TOOLCHAIN_VERSION"
 
           TAG=${GITHUB_REF#refs/tags/}
