@@ -128,7 +128,7 @@ jobs:
         if: steps.detect.outputs.is_release_merge == 'true'
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.QILLETNI_RELEASE_APP_ID }}
+          client-id: ${{ secrets.QILLETNI_RELEASE_APP_ID }}
           private-key: ${{ secrets.QILLETNI_RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
@@ -212,7 +212,7 @@ jobs:
 
       - name: Extract release notes
         if: steps.check.outputs.is_snapshot == 'true'
-        uses: ffurrer2/extract-release-notes@v2
+        uses: ffurrer2/extract-release-notes@v3
         with:
           changelog_file: CHANGELOG.md
           release_notes_file: RELEASE_NOTES.md
@@ -251,7 +251,7 @@ jobs:
 
       - name: Create snapshot release
         if: steps.check.outputs.is_snapshot == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: snapshot
           name: ${{ steps.check.outputs.version }}
@@ -431,14 +431,14 @@ jobs:
           echo "archive_sha256=$(sha256sum qilletni-${{ steps.check.outputs.version }}.tar.gz | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
       - name: Extract release notes
-        uses: ffurrer2/extract-release-notes@v2
+        uses: ffurrer2/extract-release-notes@v3
         with:
           changelog_file: CHANGELOG.md
           release_notes_file: RELEASE_NOTES.md
           prerelease: false
 
       - name: Create GitHub Release with SBOM and component manifest assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.check.outputs.version }}
           name: v${{ steps.check.outputs.version }}
@@ -522,13 +522,13 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.QILLETNI_RELEASE_APP_ID }}
+          client-id: ${{ secrets.QILLETNI_RELEASE_APP_ID }}
           private-key: ${{ secrets.QILLETNI_RELEASE_APP_PRIVATE_KEY }}
           owner: Qilletni
           repositories: Qilletni
 
       - name: Dispatch the platform-component release event to Qilletni/Qilletni
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@v4
         with:
           token: ${{ steps.app-token.outputs.token }}
           repository: Qilletni/Qilletni
