@@ -7,11 +7,11 @@ import dev.qilletni.impl.lang.runner.QilletniProgramRunner;
 import dev.qilletni.impl.lib.LibrarySourceFileResolver;
 import dev.qilletni.pkgutil.manifest.ManifestFinder;
 import dev.qilletni.toolchain.LogSetup;
-import dev.qilletni.toolchain.utils.PathUtility;
 import dev.qilletni.toolchain.qll.GradleProjectHelper;
 import dev.qilletni.toolchain.qll.LibraryValidator;
 import dev.qilletni.toolchain.qll.QllJarExtractor;
 import dev.qilletni.toolchain.qll.QllLoader;
+import dev.qilletni.toolchain.utils.PathUtility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -174,7 +174,7 @@ public class CommandRun implements Callable<Integer> {
             
             var dynamicProvider = ServiceManager.createDynamicProvider(loadedLibraries);
 
-            var runner = new QilletniProgramRunner(dynamicProvider, librarySourceFileResolver, loadedLibraries);
+            var runner = new QilletniProgramRunner(dynamicProvider.dynamicProvider(), dynamicProvider.musicPopulator(), librarySourceFileResolver, loadedLibraries);
 
             LOGGER.debug("Importing initial files");
             
