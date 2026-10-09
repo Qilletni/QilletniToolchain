@@ -2,7 +2,10 @@ package dev.qilletni.toolchain.logging;
 
 import dev.qilletni.api.exceptions.QilletniException;
 import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.core.*;
+import org.apache.logging.log4j.core.Appender;
+import org.apache.logging.log4j.core.Filter;
+import org.apache.logging.log4j.core.Layout;
+import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.appender.AbstractAppender;
 import org.apache.logging.log4j.core.config.Property;
 import org.apache.logging.log4j.core.config.plugins.Plugin;
@@ -34,9 +37,10 @@ public class ProgressDisplayAppender extends AbstractAppender {
         // Note: We use %s and pass the message as an arg to prevent issues if the message contains % signs
         if (event.getLevel().equals(Level.ERROR) || event.getLevel().equals(Level.FATAL)) {
             Throwable t = event.getThrown();
-            // TODO: Are there any exceptions/edge cases to this?
-            if (t instanceof QilletniException) {
+            if (t instanceof QilletniException || t instanceof Error) {
                 ProgressDisplay.error("%s", t, message);
+            } else if (t != null) {
+                ProgressDisplay.error("%s (%s)", message, t);
             } else {
                 ProgressDisplay.error("%s", message);
             }
