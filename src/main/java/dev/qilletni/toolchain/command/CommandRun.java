@@ -3,6 +3,7 @@ package dev.qilletni.toolchain.command;
 import dev.qilletni.api.exceptions.QilletniException;
 import dev.qilletni.api.lib.qll.QllInfo;
 import dev.qilletni.impl.ServiceManager;
+import dev.qilletni.impl.debug.DebugAbortedException;
 import dev.qilletni.impl.debug.DebugController;
 import dev.qilletni.impl.lang.runner.ParsedProgram;
 import dev.qilletni.impl.lang.runner.QilletniProgramRunner;
@@ -230,15 +231,21 @@ public class CommandRun implements Callable<Integer> {
                 return 1;
             }
 
-            LOGGER.debug("Importing initial files");
-
-            runner.importInitialFiles();
-
             try {
-                LOGGER.debug("Running program: {}", file.getFileName());
-                runner.runProgram(program);
-            } catch (QilletniException e) {
-                LOGGER.error("An exception occurred while running {}", file.getFileName(), e);
+                LOGGER.debug("Importing initial files");
+
+                runner.importInitialFiles();
+
+                try {
+                    LOGGER.debug("Running program: {}", file.getFileName());
+                    runner.runProgram(program);
+                } catch (QilletniException e) {
+                    LOGGER.error("An exception occurred while running {}", file.getFileName(), e);
+                    runner.shutdown();
+                    return 1;
+                }
+            } catch (DebugAbortedException e) {
+                LOGGER.info("Program ended by the debugger");
                 runner.shutdown();
                 return 1;
             }

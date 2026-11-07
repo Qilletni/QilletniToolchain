@@ -34,7 +34,7 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
     private static final Logger LOGGER = LoggerFactory.getLogger(DebugManager.class);
 
     /**
-     * How long to wait before exiting when the IDE ends the session while the program runs.
+     * How long to wait for the program to end by itself before exiting, when the IDE ends the session while it runs.
      */
     private static final long EXIT_DELAY_MS = 200;
     
@@ -181,9 +181,12 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
     private void endRunningProgram(String reason) {
         LOGGER.info("Ending program: {}", reason);
 
-        // Exit from a separate thread after a short delay, so a disconnect response is written first. System.exit
-        // (not halt) lets Log4j's shutdown hook flush the log socket. CommandRun's finally doesn't run, but nothing
-        // there needs to: provider shutdown only stops thread pools, and the IDE is no longer listening for events.
+        // Normally the interpreter thread unwinds at its next statement, or right away if it is stopped
+        controller.abort();
+
+        // Watchdog for a program that doesn't reach a statement in time, e.g. one blocked in a native call. The
+        // delay also lets a disconnect response be written first. System.exit (not halt) lets Log4j's shutdown hook
+        // flush the log socket.
         Thread.ofPlatform().daemon().name("qilletni-dap-exit").start(() -> {
             try {
                 Thread.sleep(EXIT_DELAY_MS);
