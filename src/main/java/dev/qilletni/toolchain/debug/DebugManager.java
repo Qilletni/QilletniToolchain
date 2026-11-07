@@ -2,6 +2,7 @@ package dev.qilletni.toolchain.debug;
 
 import dev.qilletni.impl.debug.BreakpointResult;
 import dev.qilletni.impl.debug.DebugController;
+import dev.qilletni.impl.debug.DebugEventListener;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
@@ -19,13 +20,16 @@ import java.net.Socket;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class DebugManager implements IDebugProtocolServer {
+public class DebugManager implements IDebugProtocolServer, DebugEventListener {
+
+    private static final int THREAD_ID = 1;
     
     private static final Logger LOGGER = LoggerFactory.getLogger(DebugManager.class);
 
@@ -65,6 +69,7 @@ public class DebugManager implements IDebugProtocolServer {
         this.debugPort = debugPort;
         this.controller = controller;
 
+        controller.setEventListener(this);
         launched.runAfterBoth(programParsed, () -> client.initialized());
     }
 
@@ -346,7 +351,11 @@ public class DebugManager implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<ContinueResponse> continue_(ContinueArguments args) {
-        return IDebugProtocolServer.super.continue_(args);
+        controller.resume();
+
+        var response = new ContinueResponse();
+        response.setAllThreadsContinued(true);
+        return CompletableFuture.completedFuture(response);
     }
 
     @Override
@@ -391,7 +400,23 @@ public class DebugManager implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<StackTraceResponse> stackTrace(StackTraceArguments args) {
-        return IDebugProtocolServer.super.stackTrace(args);
+        return controller.submit(location -> {
+            var source = new Source();
+            source.setPath(location.source().path());
+            source.setName(location.source().name());
+
+            var frame = new StackFrame();
+            frame.setId(1);
+            frame.setName(location.functionName() == null ? "<top level>" : location.functionName());
+            frame.setSource(source);
+            frame.setLine(location.line());
+            frame.setColumn(location.column());
+
+            var response = new StackTraceResponse();
+            response.setStackFrames(new StackFrame[]{frame});
+            response.setTotalFrames(1);
+            return response;
+        });
     }
 
     @Override
@@ -416,7 +441,31 @@ public class DebugManager implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<ThreadsResponse> threads() {
-        return IDebugProtocolServer.super.threads();
+        var thread = new org.eclipse.lsp4j.debug.Thread();
+        thread.setId(THREAD_ID);
+        thread.setName("main");
+
+        var response = new ThreadsResponse();
+        response.setThreads(new org.eclipse.lsp4j.debug.Thread[]{thread});
+        return CompletableFuture.completedFuture(response);
+    }
+
+    @Override
+    public void stopped(String reason, List<Integer> hitBreakpointIds) {
+        var stopped = new StoppedEventArguments();
+        stopped.setReason(reason);
+        stopped.setThreadId(THREAD_ID);
+        stopped.setAllThreadsStopped(true);
+
+        if (!hitBreakpointIds.isEmpty()) {
+            stopped.setHitBreakpointIds(hitBreakpointIds.toArray(Integer[]::new));
+        }
+
+        try {
+            client.stopped(stopped);
+        } catch (RuntimeException e) {
+            LOGGER.debug("Unable to send stopped event, the debugger is already gone", e);
+        }
     }
 
     @Override
