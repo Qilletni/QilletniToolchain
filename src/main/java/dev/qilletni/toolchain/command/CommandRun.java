@@ -3,6 +3,7 @@ package dev.qilletni.toolchain.command;
 import dev.qilletni.api.exceptions.QilletniException;
 import dev.qilletni.api.lib.qll.QllInfo;
 import dev.qilletni.impl.ServiceManager;
+import dev.qilletni.impl.lang.runner.ParsedProgram;
 import dev.qilletni.impl.lang.runner.QilletniProgramRunner;
 import dev.qilletni.impl.lib.LibrarySourceFileResolver;
 import dev.qilletni.pkgutil.manifest.ManifestFinder;
@@ -204,6 +205,16 @@ public class CommandRun implements Callable<Integer> {
 
             var runner = new QilletniProgramRunner(dynamicProvider.dynamicProvider(), dynamicProvider.musicPopulator(), librarySourceFileResolver, loadedLibraries);
 
+            ParsedProgram program;
+            try {
+                // Parsed early so the main file's breakpoints can be verified during configuration
+                program = runner.parseProgram(file);
+            } catch (QilletniException | IOException e) {
+                LOGGER.error("An exception occurred while parsing {}", file.getFileName(), e);
+                runner.shutdown();
+                return 1;
+            }
+
             // No Qilletni code (including auto-imports) may run before the IDE has sent its breakpoints
             if (debugManager != null && !debugManager.awaitConfigured()) {
                 LOGGER.info("Debugger disconnected before the program started");
@@ -216,8 +227,8 @@ public class CommandRun implements Callable<Integer> {
 
             try {
                 LOGGER.debug("Running program: {}", file.getFileName());
-                runner.runProgram(file);
-            } catch (QilletniException | IOException e) {
+                runner.runProgram(program);
+            } catch (QilletniException e) {
                 LOGGER.error("An exception occurred while running {}", file.getFileName(), e);
                 runner.shutdown();
                 return 1;
