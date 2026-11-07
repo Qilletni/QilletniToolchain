@@ -6,6 +6,7 @@ import dev.qilletni.impl.debug.DebugEventListener;
 import dev.qilletni.impl.debug.DebugScope;
 import dev.qilletni.impl.debug.Frame;
 import dev.qilletni.impl.debug.SourceId;
+import dev.qilletni.impl.debug.StepMode;
 import dev.qilletni.impl.debug.StoppedView;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
@@ -368,7 +369,7 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
 
     @Override
     public CompletableFuture<ContinueResponse> continue_(ContinueArguments args) {
-        controller.resume();
+        controller.resume(StepMode.NONE);
 
         var response = new ContinueResponse();
         response.setAllThreadsContinued(true);
@@ -377,17 +378,20 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
 
     @Override
     public CompletableFuture<Void> next(NextArguments args) {
-        return IDebugProtocolServer.super.next(args);
+        controller.resume(StepMode.NEXT);
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> stepIn(StepInArguments args) {
-        return IDebugProtocolServer.super.stepIn(args);
+        controller.resume(StepMode.STEP_IN);
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> stepOut(StepOutArguments args) {
-        return IDebugProtocolServer.super.stepOut(args);
+        controller.resume(StepMode.STEP_OUT);
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
@@ -412,7 +416,8 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
 
     @Override
     public CompletableFuture<Void> pause(PauseArguments args) {
-        return IDebugProtocolServer.super.pause(args);
+        controller.pause();
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
