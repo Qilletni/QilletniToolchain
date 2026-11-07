@@ -11,4 +11,6 @@ module qilletni.toolchain {
     requires org.apache.logging.log4j.core;
     requires qilletni.toolchain.logging;
     requires qilletni.pkgutil;
+    requires org.eclipse.lsp4j.debug;
+    requires org.eclipse.lsp4j.jsonrpc;
 }
