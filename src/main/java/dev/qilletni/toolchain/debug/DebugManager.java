@@ -1,5 +1,7 @@
 package dev.qilletni.toolchain.debug;
 
+import dev.qilletni.impl.debug.BreakpointResult;
+import dev.qilletni.impl.debug.DebugController;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
@@ -14,6 +16,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.lang.Thread;
 import java.net.Socket;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -46,10 +51,32 @@ public class DebugManager implements IDebugProtocolServer {
      */
     private final AtomicBoolean sessionOver = new AtomicBoolean();
 
-    private final int debugPort;
+    /**
+     * {@code initialized} is only sent once both complete: the IDE sends breakpoints right after it, and the main
+     * file must be parsed by then for its breakpoints to be verified.
+     */
+    private final CompletableFuture<Void> launched = new CompletableFuture<>();
+    private final CompletableFuture<Void> programParsed = new CompletableFuture<>();
 
-    public DebugManager(int debugPort) {
+    private final int debugPort;
+    private final DebugController controller;
+
+    public DebugManager(int debugPort, DebugController controller) {
         this.debugPort = debugPort;
+        this.controller = controller;
+
+        launched.runAfterBoth(programParsed, () -> client.initialized());
+    }
+
+    public DebugController getController() {
+        return controller;
+    }
+
+    /**
+     * Called once the main file has been parsed, and its breakable lines registered with the controller.
+     */
+    public void programParsed() {
+        programParsed.complete(null);
     }
 
     /**
@@ -203,8 +230,8 @@ public class DebugManager implements IDebugProtocolServer {
             return CompletableFuture.failedFuture(new ResponseErrorException(new ResponseError(ResponseErrorCode.InvalidParams, "Invalid qilletniProtocol", null)));
         }
 
-        client.initialized();
-        
+        launched.complete(null);
+
         return CompletableFuture.completedFuture(null);
     }
 
@@ -237,7 +264,59 @@ public class DebugManager implements IDebugProtocolServer {
 
     @Override
     public CompletableFuture<SetBreakpointsResponse> setBreakpoints(SetBreakpointsArguments args) {
-        return IDebugProtocolServer.super.setBreakpoints(args);
+        var source = args.getSource();
+        var requested = args.getBreakpoints() == null ? new SourceBreakpoint[0] : args.getBreakpoints();
+        var lines = Arrays.stream(requested).map(SourceBreakpoint::getLine).toList();
+
+        LOGGER.debug("setBreakpoints {} {}", source.getPath(), lines);
+
+        Breakpoint[] breakpoints;
+        if (source.getPath() == null) {
+            breakpoints = lines.stream().map(line -> {
+                var breakpoint = new Breakpoint();
+                breakpoint.setVerified(false);
+                breakpoint.setLine(line);
+                breakpoint.setMessage("Source has no path");
+                return breakpoint;
+            }).toArray(Breakpoint[]::new);
+        } else {
+            breakpoints = controller.setBreakpoints(normalizeSourcePath(source.getPath()), lines).stream()
+                    .map(result -> toBreakpoint(result, source))
+                    .toArray(Breakpoint[]::new);
+        }
+
+        var response = new SetBreakpointsResponse();
+        response.setBreakpoints(breakpoints);
+        return CompletableFuture.completedFuture(response);
+    }
+
+    /**
+     * Resolves symlinks in disk paths so they match {@link dev.qilletni.impl.debug.SourceId#path()}.
+     */
+    private static String normalizeSourcePath(String path) {
+        if (path.startsWith("qll://")) {
+            return path;
+        }
+
+        try {
+            return Path.of(path).toRealPath().toString();
+        } catch (IOException | InvalidPathException e) {
+            return path;
+        }
+    }
+
+    private static Breakpoint toBreakpoint(BreakpointResult result, Source source) {
+        var breakpoint = new Breakpoint();
+        breakpoint.setId(result.id());
+        breakpoint.setVerified(result.status() == BreakpointResult.Status.VERIFIED);
+        breakpoint.setLine(result.line());
+        breakpoint.setSource(source);
+
+        if (result.status() == BreakpointResult.Status.INVALID) {
+            breakpoint.setMessage(result.message());
+        }
+
+        return breakpoint;
     }
 
     @Override
