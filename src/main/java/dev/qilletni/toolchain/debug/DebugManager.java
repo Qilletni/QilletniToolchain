@@ -1,9 +1,11 @@
 package dev.qilletni.toolchain.debug;
 
 import dev.qilletni.impl.debug.BreakpointResult;
+import dev.qilletni.impl.debug.ChildFilter;
 import dev.qilletni.impl.debug.DebugController;
 import dev.qilletni.impl.debug.DebugEventListener;
 import dev.qilletni.impl.debug.DebugScope;
+import dev.qilletni.impl.debug.EvalMode;
 import dev.qilletni.impl.debug.Frame;
 import dev.qilletni.impl.debug.SourceId;
 import dev.qilletni.impl.debug.StepMode;
@@ -222,7 +224,7 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
         
         var capabilities = new Capabilities();
         capabilities.setSupportsConfigurationDoneRequest(true);
-//        capabilities.setSupportsEvaluateForHovers(true);
+        capabilities.setSupportsEvaluateForHovers(true);
         
         return CompletableFuture.completedFuture(capabilities);
     }
@@ -487,14 +489,25 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
 
     @Override
     public CompletableFuture<VariablesResponse> variables(VariablesArguments args) {
+        var filter = args.getFilter() == null ? ChildFilter.ALL : switch (args.getFilter()) {
+            case INDEXED -> ChildFilter.INDEXED;
+            case NAMED -> ChildFilter.NAMED;
+        };
+        int start = args.getStart() == null ? 0 : args.getStart();
+        int count = args.getCount() == null ? 0 : args.getCount();
+
         return submit(view -> {
-            var variables = view.variables(args.getVariablesReference()).stream().map(debugVariable -> {
+            var variables = view.variables(args.getVariablesReference(), filter, start, count).stream().map(debugVariable -> {
                 var variable = new Variable();
                 variable.setName(debugVariable.name());
                 variable.setValue(debugVariable.value());
                 variable.setType(debugVariable.type());
                 variable.setEvaluateName(debugVariable.evaluateName());
                 variable.setVariablesReference(debugVariable.variablesReference());
+
+                if (debugVariable.indexedVariables() > 0) {
+                    variable.setIndexedVariables(debugVariable.indexedVariables());
+                }
 
                 if (debugVariable.property()) {
                     var hint = new VariablePresentationHint();
@@ -567,7 +580,23 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
 
     @Override
     public CompletableFuture<EvaluateResponse> evaluate(EvaluateArguments args) {
-        return IDebugProtocolServer.super.evaluate(args);
+        var mode = EvaluateArgumentsContext.REPL.equals(args.getContext()) ? EvalMode.REPL : EvalMode.WATCH;
+        int frameId = args.getFrameId() == null ? 0 : args.getFrameId();
+
+        return submit(view -> {
+            var result = view.evaluate(frameId, args.getExpression(), mode);
+
+            var response = new EvaluateResponse();
+            response.setResult(result.value());
+            response.setType(result.type());
+            response.setVariablesReference(result.variablesReference());
+
+            if (result.indexedVariables() > 0) {
+                response.setIndexedVariables(result.indexedVariables());
+            }
+
+            return response;
+        });
     }
 
     @Override
