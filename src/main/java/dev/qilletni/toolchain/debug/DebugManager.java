@@ -3,6 +3,7 @@ package dev.qilletni.toolchain.debug;
 import dev.qilletni.impl.debug.BreakpointResult;
 import dev.qilletni.impl.debug.DebugController;
 import dev.qilletni.impl.debug.DebugEventListener;
+import dev.qilletni.impl.debug.SourceId;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
@@ -62,6 +63,9 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
     private final CompletableFuture<Void> launched = new CompletableFuture<>();
     private final CompletableFuture<Void> programParsed = new CompletableFuture<>();
 
+    private volatile boolean stopOnEntry;
+    private volatile SourceId mainSource;
+
     private final int debugPort;
     private final DebugController controller;
 
@@ -80,7 +84,8 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
     /**
      * Called once the main file has been parsed, and its breakable lines registered with the controller.
      */
-    public void programParsed() {
+    public void programParsed(SourceId mainSource) {
+        this.mainSource = mainSource;
         programParsed.complete(null);
     }
 
@@ -219,6 +224,12 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
     @Override
     public CompletableFuture<Void> configurationDone(ConfigurationDoneArguments args) {
         LOGGER.debug("Configuration is done, notifying...");
+
+        // launch and programParsed both come before configurationDone, since initialized waits for them
+        if (stopOnEntry && mainSource != null) {
+            controller.stopOnEntry(mainSource);
+        }
+
         configured.complete(true);
         
         return CompletableFuture.completedFuture(null);
@@ -230,14 +241,12 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
         
         double qilletniProtocol = Double.parseDouble(args.getOrDefault("qilletniProtocol", "0.0").toString());
         
-        // Stop on first statement of first file. Ignore for now.
-        var stopOnEntry = Boolean.valueOf(args.getOrDefault("stopOnEntry", "false").toString());
-        
         if (qilletniProtocol != 1.0) {
             LOGGER.error("Got invalid qilletniProtocol: {}", qilletniProtocol);
             return CompletableFuture.failedFuture(new ResponseErrorException(new ResponseError(ResponseErrorCode.InvalidParams, "Invalid qilletniProtocol", null)));
         }
 
+        stopOnEntry = Boolean.parseBoolean(args.getOrDefault("stopOnEntry", "false").toString());
         launched.complete(null);
 
         return CompletableFuture.completedFuture(null);

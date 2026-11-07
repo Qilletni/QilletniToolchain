@@ -222,7 +222,7 @@ public class CommandRun implements Callable<Integer> {
             }
 
             if (debugManager != null) {
-                debugManager.programParsed();
+                debugManager.programParsed(program.sourceId());
             }
 
             // No Qilletni code (including auto-imports) may run before the IDE has sent its breakpoints
