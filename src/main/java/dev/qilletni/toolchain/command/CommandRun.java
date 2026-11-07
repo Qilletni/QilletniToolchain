@@ -203,7 +203,9 @@ public class CommandRun implements Callable<Integer> {
         try {
             Thread.currentThread().setContextClassLoader(qllJarClassLoader);
 
-            var dynamicProvider = ServiceManager.createDynamicProvider(loadedLibraries);
+            var dynamicProvider = debugManager != null
+                    ? ServiceManager.createDynamicProvider(loadedLibraries, debugManager.getController())
+                    : ServiceManager.createDynamicProvider(loadedLibraries);
 
             var runner = new QilletniProgramRunner(dynamicProvider.dynamicProvider(), dynamicProvider.musicPopulator(), librarySourceFileResolver, loadedLibraries);
 

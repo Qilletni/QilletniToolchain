@@ -41,6 +41,8 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
     private static final int THREAD_ID = 1;
 
     private static final String UNCAUGHT_FILTER = "uncaught";
+    private static final String SONG_PLAYED_FILTER = "songPlayed";
+    private static final String WEIGHT_SELECTED_FILTER = "weightSelected";
     
     private static final Logger LOGGER = LoggerFactory.getLogger(DebugManager.class);
 
@@ -232,7 +234,18 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
         uncaught.setFilter(UNCAUGHT_FILTER);
         uncaught.setLabel("Uncaught Qilletni errors");
         uncaught.setDefault_(true);
-        capabilities.setExceptionBreakpointFilters(new ExceptionBreakpointsFilter[]{uncaught});
+
+        var songPlayed = new ExceptionBreakpointsFilter();
+        songPlayed.setFilter(SONG_PLAYED_FILTER);
+        songPlayed.setLabel("Song played");
+        songPlayed.setDefault_(false);
+
+        var weightSelected = new ExceptionBreakpointsFilter();
+        weightSelected.setFilter(WEIGHT_SELECTED_FILTER);
+        weightSelected.setLabel("Weight selected");
+        weightSelected.setDefault_(false);
+
+        capabilities.setExceptionBreakpointFilters(new ExceptionBreakpointsFilter[]{uncaught, songPlayed, weightSelected});
         
         return CompletableFuture.completedFuture(capabilities);
     }
@@ -361,6 +374,8 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
     public CompletableFuture<SetExceptionBreakpointsResponse> setExceptionBreakpoints(SetExceptionBreakpointsArguments args) {
         var filters = args.getFilters() == null ? List.<String>of() : Arrays.asList(args.getFilters());
         controller.setStopOnUncaught(filters.contains(UNCAUGHT_FILTER));
+        controller.setStopOnSongPlayed(filters.contains(SONG_PLAYED_FILTER));
+        controller.setStopOnWeightSelected(filters.contains(WEIGHT_SELECTED_FILTER));
         return CompletableFuture.completedFuture(new SetExceptionBreakpointsResponse());
     }
 
@@ -480,7 +495,7 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
         return submit(view -> {
             var scopes = view.scopes(args.getFrameId()).stream().map(debugScope -> {
                 var scope = new Scope();
-                scope.setName(debugScope.kind().displayName());
+                scope.setName(debugScope.name());
                 scope.setVariablesReference(debugScope.variablesReference());
                 scope.setExpensive(debugScope.kind() == DebugScope.Kind.GLOBALS);
 
