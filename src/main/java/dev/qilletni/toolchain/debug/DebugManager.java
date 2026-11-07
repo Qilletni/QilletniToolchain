@@ -39,6 +39,8 @@ import java.util.function.Function;
 public class DebugManager implements IDebugProtocolServer, DebugEventListener {
 
     private static final int THREAD_ID = 1;
+
+    private static final String UNCAUGHT_FILTER = "uncaught";
     
     private static final Logger LOGGER = LoggerFactory.getLogger(DebugManager.class);
 
@@ -225,6 +227,12 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
         var capabilities = new Capabilities();
         capabilities.setSupportsConfigurationDoneRequest(true);
         capabilities.setSupportsEvaluateForHovers(true);
+
+        var uncaught = new ExceptionBreakpointsFilter();
+        uncaught.setFilter(UNCAUGHT_FILTER);
+        uncaught.setLabel("Uncaught Qilletni errors");
+        uncaught.setDefault_(true);
+        capabilities.setExceptionBreakpointFilters(new ExceptionBreakpointsFilter[]{uncaught});
         
         return CompletableFuture.completedFuture(capabilities);
     }
@@ -351,7 +359,9 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
 
     @Override
     public CompletableFuture<SetExceptionBreakpointsResponse> setExceptionBreakpoints(SetExceptionBreakpointsArguments args) {
-        return IDebugProtocolServer.super.setExceptionBreakpoints(args);
+        var filters = args.getFilters() == null ? List.<String>of() : Arrays.asList(args.getFilters());
+        controller.setStopOnUncaught(filters.contains(UNCAUGHT_FILTER));
+        return CompletableFuture.completedFuture(new SetExceptionBreakpointsResponse());
     }
 
     @Override
@@ -546,11 +556,13 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
     }
 
     @Override
-    public void stopped(String reason, List<Integer> hitBreakpointIds) {
+    public void stopped(String reason, List<Integer> hitBreakpointIds, String description, String text) {
         var stopped = new StoppedEventArguments();
         stopped.setReason(reason);
         stopped.setThreadId(THREAD_ID);
         stopped.setAllThreadsStopped(true);
+        stopped.setDescription(description);
+        stopped.setText(text);
 
         if (!hitBreakpointIds.isEmpty()) {
             stopped.setHitBreakpointIds(hitBreakpointIds.toArray(Integer[]::new));
@@ -560,6 +572,22 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
             client.stopped(stopped);
         } catch (RuntimeException e) {
             LOGGER.debug("Unable to send stopped event, the debugger is already gone", e);
+        }
+    }
+
+    @Override
+    public void breakpointChanged(String sourcePath, BreakpointResult result) {
+        var source = new Source();
+        source.setPath(sourcePath);
+
+        var event = new BreakpointEventArguments();
+        event.setReason(BreakpointEventArgumentsReason.CHANGED);
+        event.setBreakpoint(toBreakpoint(result, source));
+
+        try {
+            client.breakpoint(event);
+        } catch (RuntimeException e) {
+            LOGGER.debug("Unable to send breakpoint event, the debugger is already gone", e);
         }
     }
 

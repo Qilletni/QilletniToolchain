@@ -232,15 +232,19 @@ public class CommandRun implements Callable<Integer> {
             }
 
             try {
-                LOGGER.debug("Importing initial files");
-
-                runner.importInitialFiles();
-
                 try {
+                    LOGGER.debug("Importing initial files");
+                    runner.importInitialFiles();
+
                     LOGGER.debug("Running program: {}", file.getFileName());
                     runner.runProgram(program);
                 } catch (QilletniException e) {
                     LOGGER.error("An exception occurred while running {}", file.getFileName(), e);
+
+                    if (debugManager != null) {
+                        debugManager.getController().programFailed(e);
+                    }
+
                     runner.shutdown();
                     return 1;
                 }
