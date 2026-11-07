@@ -3,7 +3,10 @@ package dev.qilletni.toolchain.debug;
 import dev.qilletni.impl.debug.BreakpointResult;
 import dev.qilletni.impl.debug.DebugController;
 import dev.qilletni.impl.debug.DebugEventListener;
+import dev.qilletni.impl.debug.DebugScope;
+import dev.qilletni.impl.debug.Frame;
 import dev.qilletni.impl.debug.SourceId;
+import dev.qilletni.impl.debug.StoppedView;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
@@ -24,9 +27,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 
 public class DebugManager implements IDebugProtocolServer, DebugEventListener {
 
@@ -412,33 +417,93 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
 
     @Override
     public CompletableFuture<StackTraceResponse> stackTrace(StackTraceArguments args) {
-        return controller.submit(location -> {
-            var source = new Source();
-            source.setPath(location.source().path());
-            source.setName(location.source().name());
-
-            var frame = new StackFrame();
-            frame.setId(1);
-            frame.setName(location.functionName() == null ? "<top level>" : location.functionName());
-            frame.setSource(source);
-            frame.setLine(location.line());
-            frame.setColumn(location.column());
+        return submit(view -> {
+            var frames = view.frames().stream().map(frame -> toStackFrame(view, frame)).toArray(StackFrame[]::new);
 
             var response = new StackTraceResponse();
-            response.setStackFrames(new StackFrame[]{frame});
-            response.setTotalFrames(1);
+            response.setStackFrames(frames);
+            response.setTotalFrames(frames.length);
             return response;
+        });
+    }
+
+    private static StackFrame toStackFrame(StoppedView view, Frame frame) {
+        var stackFrame = new StackFrame();
+        stackFrame.setId(view.frameId(frame));
+        stackFrame.setName(frame.name());
+        stackFrame.setLine(frame.line());
+        stackFrame.setColumn(frame.column());
+
+        if (frame.kind() == Frame.Kind.NATIVE) {
+            stackFrame.setPresentationHint(StackFramePresentationHint.SUBTLE);
+        }
+
+        if (frame.source() != null) {
+            var source = new Source();
+            source.setPath(frame.source().path());
+            source.setName(frame.source().name());
+            stackFrame.setSource(source);
+        }
+
+        return stackFrame;
+    }
+
+    /**
+     * Runs {@code work} on the stopped interpreter thread, turning a failure into an error response with its message.
+     */
+    private <T> CompletableFuture<T> submit(Function<StoppedView, T> work) {
+        return controller.submit(work).exceptionallyCompose(e -> {
+            var cause = e instanceof CompletionException && e.getCause() != null ? e.getCause() : e;
+            return CompletableFuture.failedFuture(new ResponseErrorException(new ResponseError(ResponseErrorCode.InvalidRequest, cause.getMessage(), null)));
         });
     }
 
     @Override
     public CompletableFuture<ScopesResponse> scopes(ScopesArguments args) {
-        return IDebugProtocolServer.super.scopes(args);
+        return submit(view -> {
+            var scopes = view.scopes(args.getFrameId()).stream().map(debugScope -> {
+                var scope = new Scope();
+                scope.setName(debugScope.kind().displayName());
+                scope.setVariablesReference(debugScope.variablesReference());
+                scope.setExpensive(debugScope.kind() == DebugScope.Kind.GLOBALS);
+
+                if (debugScope.kind() == DebugScope.Kind.LOCALS) {
+                    scope.setPresentationHint(ScopePresentationHint.LOCALS);
+                }
+
+                return scope;
+            }).toArray(Scope[]::new);
+
+            var response = new ScopesResponse();
+            response.setScopes(scopes);
+            return response;
+        });
     }
 
     @Override
     public CompletableFuture<VariablesResponse> variables(VariablesArguments args) {
-        return IDebugProtocolServer.super.variables(args);
+        return submit(view -> {
+            var variables = view.variables(args.getVariablesReference()).stream().map(debugVariable -> {
+                var variable = new Variable();
+                variable.setName(debugVariable.name());
+                variable.setValue(debugVariable.value());
+                variable.setType(debugVariable.type());
+                variable.setEvaluateName(debugVariable.evaluateName());
+                variable.setVariablesReference(debugVariable.variablesReference());
+
+                if (debugVariable.property()) {
+                    var hint = new VariablePresentationHint();
+                    hint.setKind(VariablePresentationHintKind.PROPERTY);
+                    variable.setPresentationHint(hint);
+                }
+
+                return variable;
+            }).toArray(Variable[]::new);
+
+            var response = new VariablesResponse();
+            response.setVariables(variables);
+            return response;
+        });
     }
 
     @Override
