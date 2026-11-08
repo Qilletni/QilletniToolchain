@@ -13,4 +13,8 @@ module qilletni.toolchain {
     requires qilletni.pkgutil;
     requires org.eclipse.lsp4j.debug;
     requires org.eclipse.lsp4j.jsonrpc;
+    requires org.eclipse.lsp4j.jsonrpc.debug;
+
+    // Gson serializes the custom DAP event bodies
+    opens dev.qilletni.toolchain.debug to com.google.gson;
 }

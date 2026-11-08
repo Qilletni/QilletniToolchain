@@ -10,11 +10,11 @@ import dev.qilletni.impl.debug.Frame;
 import dev.qilletni.impl.debug.SourceId;
 import dev.qilletni.impl.debug.StepMode;
 import dev.qilletni.impl.debug.StoppedView;
+import dev.qilletni.impl.debug.WeightPick;
 import org.eclipse.lsp4j.debug.*;
-import org.eclipse.lsp4j.debug.launch.DSPLauncher;
-import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
+import org.eclipse.lsp4j.jsonrpc.debug.DebugLauncher;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
@@ -36,7 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
-public class DebugManager implements IDebugProtocolServer, DebugEventListener {
+public class DebugManager implements IDebugProtocolServer, QilletniDebugServer, DebugEventListener {
 
     private static final int THREAD_ID = 1;
 
@@ -51,7 +51,7 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
      */
     private static final long EXIT_DELAY_MS = 200;
     
-    private IDebugProtocolClient client;
+    private QilletniDebugClient client;
     private InitializeRequestArguments initializedArgs;
     
     private Socket socket;
@@ -115,7 +115,7 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
             return thread;
         });
 
-        Launcher<IDebugProtocolClient> launcher = DSPLauncher.createServerLauncher(this, socket.getInputStream(), socket.getOutputStream(), executor, null);
+        Launcher<QilletniDebugClient> launcher = DebugLauncher.createLauncher(this, QilletniDebugClient.class, socket.getInputStream(), socket.getOutputStream(), executor, null);
         client = launcher.getRemoteProxy();
 
         var listening = launcher.startListening();
@@ -276,6 +276,7 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
         }
 
         stopOnEntry = Boolean.parseBoolean(args.getOrDefault("stopOnEntry", "false").toString());
+        controller.setWeightEvents(Boolean.parseBoolean(args.getOrDefault("weightEvents", "false").toString()));
         launched.complete(null);
 
         return CompletableFuture.completedFuture(null);
@@ -587,6 +588,25 @@ public class DebugManager implements IDebugProtocolServer, DebugEventListener {
             client.stopped(stopped);
         } catch (RuntimeException e) {
             LOGGER.debug("Unable to send stopped event, the debugger is already gone", e);
+        }
+    }
+
+    @Override
+    public CompletableFuture<WeightEntrySongsResponse> weightEntrySongs(WeightEntrySongsArguments args) {
+        try {
+            var indices = args.indices != null ? args.indices : List.<Integer>of();
+            return CompletableFuture.completedFuture(WeightEntrySongsResponse.of(controller.weightEntrySongs(args.weightsId, indices)));
+        } catch (IllegalArgumentException e) {
+            return CompletableFuture.failedFuture(new ResponseErrorException(new ResponseError(ResponseErrorCode.InvalidParams, e.getMessage(), null)));
+        }
+    }
+
+    @Override
+    public void weightPicked(WeightPick pick) {
+        try {
+            client.weightPicked(WeightPickedEventArguments.of(pick));
+        } catch (RuntimeException e) {
+            LOGGER.debug("Unable to send weight event, the debugger is already gone", e);
         }
     }
 
