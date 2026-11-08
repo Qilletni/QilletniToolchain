@@ -51,6 +51,14 @@ public class WeightPickedEventArguments {
         public String source;
         public int listSize;
         public int songCount;
+        public double amount;
+        public boolean sequential;
+        /** Where the entry is written: a DAP source path and 1-based lines and columns, the end column exclusive. */
+        public String sourcePath;
+        public int line;
+        public int column;
+        public int endLine;
+        public int endColumn;
         public List<Node> children;
     }
 
@@ -107,6 +115,15 @@ public class WeightPickedEventArguments {
         node.source = from.source();
         node.listSize = from.listSize();
         node.songCount = from.songCount();
+        node.amount = from.amount();
+        node.sequential = from.sequential();
+        if (from.span() != null) {
+            node.sourcePath = from.span().source().path();
+            node.line = from.span().line();
+            node.column = from.span().column();
+            node.endLine = from.span().endLine();
+            node.endColumn = from.span().endColumn();
+        }
         node.children = from.children().stream().map(WeightPickedEventArguments::node).toList();
         return node;
     }
