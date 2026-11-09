@@ -133,6 +133,7 @@ public class QllLoader {
                     });
         }
 
+        librarySourceFileResolver.addLibraryDiskResolver(qllInfo.name(), sourceMap::get);
         librarySourceFileResolver.addLibraryResolver(qllInfo.name(), importPath ->
                 sourceCache.computeIfAbsent(importPath, path -> {
                     var actualPath = sourceMap.get(path);

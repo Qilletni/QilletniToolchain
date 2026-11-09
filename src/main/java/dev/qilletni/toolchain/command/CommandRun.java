@@ -3,10 +3,14 @@ package dev.qilletni.toolchain.command;
 import dev.qilletni.api.exceptions.QilletniException;
 import dev.qilletni.api.lib.qll.QllInfo;
 import dev.qilletni.impl.ServiceManager;
+import dev.qilletni.impl.debug.DebugAbortedException;
+import dev.qilletni.impl.debug.DebugController;
+import dev.qilletni.impl.lang.runner.ParsedProgram;
 import dev.qilletni.impl.lang.runner.QilletniProgramRunner;
 import dev.qilletni.impl.lib.LibrarySourceFileResolver;
 import dev.qilletni.pkgutil.manifest.ManifestFinder;
 import dev.qilletni.toolchain.LogSetup;
+import dev.qilletni.toolchain.debug.DebugManager;
 import dev.qilletni.toolchain.qll.GradleProjectHelper;
 import dev.qilletni.toolchain.qll.LibraryValidator;
 import dev.qilletni.toolchain.qll.QllJarExtractor;
@@ -46,6 +50,9 @@ public class CommandRun implements Callable<Integer> {
 
     @CommandLine.Option(names = {"--log-port", "-p"}, defaultValue = "-1", description = "The port to use for logging")
     private int logPort;
+
+    @CommandLine.Option(names = {"--debug-port"}, defaultValue = "-1", description = "The port to use for debugging via DAP")
+    private int debugPort;
     
     @CommandLine.Parameters(description = "The .ql file to run", index = "0")
     private Path file; // first is the file to run, after is the params
@@ -55,11 +62,35 @@ public class CommandRun implements Callable<Integer> {
 
     @Override
     public Integer call() throws IOException {
-
         if (logPort > 0) {
             LogSetup.setupLogSocket(logPort);
         }
 
+        DebugManager debugManager = null;
+        if (debugPort > 0) {
+            debugManager = new DebugManager(debugPort, new DebugController());
+
+            try {
+                debugManager.connect();
+            } catch (IOException e) {
+                LOGGER.error("Unable to connect to the debugger on port {}", debugPort, e);
+                return 1;
+            }
+        }
+
+        // Stays 1 if runProgram throws, so the debugger sees a failure
+        int exitCode = 1;
+        try {
+            exitCode = runProgram(debugManager);
+            return exitCode;
+        } finally {
+            if (debugManager != null) {
+                debugManager.close(exitCode);
+            }
+        }
+    }
+
+    private int runProgram(DebugManager debugManager) throws IOException {
         if (Files.notExists(file)) {
             LOGGER.error("Qilletni input file {} does not exist!", file.toAbsolutePath());
             return 1;
@@ -151,7 +182,7 @@ public class CommandRun implements Callable<Integer> {
                             } catch (IOException | URISyntaxException e) {
                                 throw new RuntimeException(e);
                             }
-                });
+                        });
             } catch (IOException e) {
                 LOGGER.error("An exception occurred while reading dependencies", e);
             }
@@ -171,20 +202,56 @@ public class CommandRun implements Callable<Integer> {
 
         try {
             Thread.currentThread().setContextClassLoader(qllJarClassLoader);
-            
-            var dynamicProvider = ServiceManager.createDynamicProvider(loadedLibraries);
+
+            var dynamicProvider = debugManager != null
+                    ? ServiceManager.createDynamicProvider(loadedLibraries, debugManager.getController())
+                    : ServiceManager.createDynamicProvider(loadedLibraries);
 
             var runner = new QilletniProgramRunner(dynamicProvider.dynamicProvider(), dynamicProvider.musicPopulator(), librarySourceFileResolver, loadedLibraries);
 
-            LOGGER.debug("Importing initial files");
-            
-            runner.importInitialFiles();
+            if (debugManager != null) {
+                runner.setExecutionHooks(debugManager.getController());
+            }
+
+            ParsedProgram program;
+            try {
+                // Parsed early so the main file's breakpoints can be verified during configuration
+                program = runner.parseProgram(file);
+            } catch (QilletniException | IOException e) {
+                LOGGER.error("An exception occurred while parsing {}", file.getFileName(), e);
+                runner.shutdown();
+                return 1;
+            }
+
+            if (debugManager != null) {
+                debugManager.programParsed(program.sourceId());
+            }
+
+            // No Qilletni code (including auto-imports) may run before the IDE has sent its breakpoints
+            if (debugManager != null && !debugManager.awaitConfigured()) {
+                LOGGER.info("Debugger disconnected before the program started");
+                return 1;
+            }
 
             try {
-                LOGGER.debug("Running program: {}", file.getFileName());
-                runner.runProgram(file);
-            } catch (QilletniException | IOException e) {
-                LOGGER.error("An exception occurred while running {}", file.getFileName(), e);
+                try {
+                    LOGGER.debug("Importing initial files");
+                    runner.importInitialFiles();
+
+                    LOGGER.debug("Running program: {}", file.getFileName());
+                    runner.runProgram(program);
+                } catch (QilletniException e) {
+                    LOGGER.error("An exception occurred while running {}", file.getFileName(), e);
+
+                    if (debugManager != null) {
+                        debugManager.getController().programFailed(e);
+                    }
+
+                    runner.shutdown();
+                    return 1;
+                }
+            } catch (DebugAbortedException e) {
+                LOGGER.info("Program ended by the debugger");
                 runner.shutdown();
                 return 1;
             }

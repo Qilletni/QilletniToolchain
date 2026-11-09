@@ -1,0 +1,709 @@
+package dev.qilletni.toolchain.debug;
+
+import dev.qilletni.impl.debug.BreakpointResult;
+import dev.qilletni.impl.debug.ChildFilter;
+import dev.qilletni.impl.debug.DebugController;
+import dev.qilletni.impl.debug.DebugEventListener;
+import dev.qilletni.impl.debug.DebugScope;
+import dev.qilletni.impl.debug.EvalMode;
+import dev.qilletni.impl.debug.Frame;
+import dev.qilletni.impl.debug.SourceId;
+import dev.qilletni.impl.debug.StepMode;
+import dev.qilletni.impl.debug.StoppedView;
+import dev.qilletni.impl.debug.WeightPick;
+import org.eclipse.lsp4j.debug.*;
+import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
+import org.eclipse.lsp4j.jsonrpc.Launcher;
+import org.eclipse.lsp4j.jsonrpc.debug.DebugLauncher;
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.lang.Thread;
+import java.net.Socket;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
+
+public class DebugManager implements IDebugProtocolServer, QilletniDebugServer, DebugEventListener {
+
+    private static final int THREAD_ID = 1;
+
+    private static final String UNCAUGHT_FILTER = "uncaught";
+    private static final String SONG_PLAYED_FILTER = "songPlayed";
+    private static final String WEIGHT_SELECTED_FILTER = "weightSelected";
+    
+    private static final Logger LOGGER = LoggerFactory.getLogger(DebugManager.class);
+
+    /**
+     * How long to wait for the program to end by itself before exiting, when the IDE ends the session while it runs.
+     */
+    private static final long EXIT_DELAY_MS = 200;
+    
+    private QilletniDebugClient client;
+    private InitializeRequestArguments initializedArgs;
+    
+    private Socket socket;
+
+    /**
+     * Completes with {@code true} on {@code configurationDone}, or {@code false} if the session ends first. Only the
+     * first completion counts, so a late {@code configurationDone} can't start an aborted program.
+     */
+    private final CompletableFuture<Boolean> configured = new CompletableFuture<>();
+
+    /**
+     * Set once the session is over, either by {@link #close(int)} or by the IDE going away, so the end is only
+     * handled once. It also stops our own socket close from looking like the IDE disconnecting.
+     */
+    private final AtomicBoolean sessionOver = new AtomicBoolean();
+
+    /**
+     * {@code initialized} is only sent once both complete: the IDE sends breakpoints right after it, and the main
+     * file must be parsed by then for its breakpoints to be verified.
+     */
+    private final CompletableFuture<Void> launched = new CompletableFuture<>();
+    private final CompletableFuture<Void> programParsed = new CompletableFuture<>();
+
+    private volatile boolean stopOnEntry;
+    private volatile SourceId mainSource;
+
+    private final int debugPort;
+    private final DebugController controller;
+
+    public DebugManager(int debugPort, DebugController controller) {
+        this.debugPort = debugPort;
+        this.controller = controller;
+
+        controller.setEventListener(this);
+        launched.runAfterBoth(programParsed, () -> client.initialized());
+    }
+
+    public DebugController getController() {
+        return controller;
+    }
+
+    /**
+     * Called once the main file has been parsed, and its breakable lines registered with the controller.
+     */
+    public void programParsed(SourceId mainSource) {
+        this.mainSource = mainSource;
+        programParsed.complete(null);
+    }
+
+    /**
+     * Connects to the IDE and starts handling DAP requests in the background. Returns as soon as the connection is
+     * made; use {@link #awaitConfigured()} before running any Qilletni code.
+     */
+    public void connect() throws IOException {
+        socket = new Socket("127.0.0.1", debugPort);
+
+        // Daemon threads, so a stuck connection never keeps the JVM alive
+        var executor = Executors.newCachedThreadPool(runnable -> {
+            var thread = new Thread(runnable, "qilletni-dap");
+            thread.setDaemon(true);
+            return thread;
+        });
+
+        Launcher<QilletniDebugClient> launcher = DebugLauncher.createLauncher(this, QilletniDebugClient.class, socket.getInputStream(), socket.getOutputStream(), executor, null);
+        client = launcher.getRemoteProxy();
+
+        var listening = launcher.startListening();
+        LOGGER.info("Connected to debugger on port {}", debugPort);
+
+        Thread.ofPlatform().daemon().name("qilletni-dap-watcher").start(() -> {
+            try {
+                listening.get();
+            } catch (ExecutionException e) {
+                LOGGER.debug("Debug connection failed", e.getCause());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            sessionEnded("debugger connection closed");
+        });
+    }
+
+    /**
+     * Blocks until the IDE has sent its breakpoints and {@code configurationDone}.
+     *
+     * @return {@code true} if the program should run, {@code false} if the IDE went away first
+     */
+    public boolean awaitConfigured() {
+        LOGGER.debug("Waiting for the debugger to finish configuration...");
+        var result = configured.join();
+        LOGGER.debug("Debugger configuration finished, running: {}", result);
+        return result;
+    }
+
+    /**
+     * Reports the end of the program to the IDE and closes the connection. Safe to call in any state, including when
+     * {@link #connect()} never ran or failed.
+     */
+    public void close(int exitCode) {
+        sessionOver.set(true);
+
+        if (client != null) {
+            try {
+                var exited = new ExitedEventArguments();
+                exited.setExitCode(exitCode);
+
+                client.terminated(new TerminatedEventArguments());
+                client.exited(exited);
+            } catch (RuntimeException e) {
+                LOGGER.debug("Unable to send exit events, the debugger is already gone", e);
+            }
+        }
+
+        if (socket != null) {
+            try {
+                socket.close();
+            } catch (IOException e) {
+                LOGGER.debug("Unable to close debug socket", e);
+            }
+        }
+    }
+
+    /**
+     * Handles the IDE ending the session (disconnect request or dropped socket). Before configuration that just
+     * releases {@link #awaitConfigured()} with {@code false}; afterwards the program is already running and must end.
+     */
+    private void sessionEnded(String reason) {
+        if (!sessionOver.compareAndSet(false, true)) {
+            return;
+        }
+
+        if (configured.complete(false)) {
+            LOGGER.info("Debug session ended before the program started: {}", reason);
+            return;
+        }
+
+        endRunningProgram(reason);
+    }
+
+    /**
+     * Called at most once, on an lsp4j thread, when the IDE disconnects or the socket drops while the program runs.
+     * For a {@code disconnect} request, the response hasn't been written yet when this is called.
+     */
+    private void endRunningProgram(String reason) {
+        LOGGER.info("Ending program: {}", reason);
+
+        // Normally the interpreter thread unwinds at its next statement, or right away if it is stopped
+        controller.abort();
+
+        // Watchdog for a program that doesn't reach a statement in time, e.g. one blocked in a native call. The
+        // delay also lets a disconnect response be written first. System.exit (not halt) lets Log4j's shutdown hook
+        // flush the log socket.
+        Thread.ofPlatform().daemon().name("qilletni-dap-exit").start(() -> {
+            try {
+                Thread.sleep(EXIT_DELAY_MS);
+            } catch (InterruptedException ignored) {
+                // Exit right away instead
+            }
+
+            System.exit(1);
+        });
+    }
+
+    @Override
+    public CompletableFuture<Void> cancel(CancelArguments args) {
+        return IDebugProtocolServer.super.cancel(args);
+    }
+
+    @Override
+    public CompletableFuture<Capabilities> initialize(InitializeRequestArguments args) {
+        LOGGER.info("Got initialize request");
+        
+        initializedArgs = args;
+        
+        var capabilities = new Capabilities();
+        capabilities.setSupportsConfigurationDoneRequest(true);
+        capabilities.setSupportsEvaluateForHovers(true);
+
+        var uncaught = new ExceptionBreakpointsFilter();
+        uncaught.setFilter(UNCAUGHT_FILTER);
+        uncaught.setLabel("Uncaught Qilletni errors");
+        uncaught.setDefault_(true);
+
+        var songPlayed = new ExceptionBreakpointsFilter();
+        songPlayed.setFilter(SONG_PLAYED_FILTER);
+        songPlayed.setLabel("Song played");
+        songPlayed.setDefault_(false);
+
+        var weightSelected = new ExceptionBreakpointsFilter();
+        weightSelected.setFilter(WEIGHT_SELECTED_FILTER);
+        weightSelected.setLabel("Weight selected");
+        weightSelected.setDefault_(false);
+
+        capabilities.setExceptionBreakpointFilters(new ExceptionBreakpointsFilter[]{uncaught, songPlayed, weightSelected});
+        
+        return CompletableFuture.completedFuture(capabilities);
+    }
+
+    @Override
+    public CompletableFuture<Void> configurationDone(ConfigurationDoneArguments args) {
+        LOGGER.debug("Configuration is done, notifying...");
+
+        // launch and programParsed both come before configurationDone, since initialized waits for them
+        if (stopOnEntry && mainSource != null) {
+            controller.stopOnEntry(mainSource);
+        }
+
+        configured.complete(true);
+        
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> launch(Map<String, Object> args) {
+        LOGGER.debug("launch() args: {}", args);
+        
+        double qilletniProtocol = Double.parseDouble(args.getOrDefault("qilletniProtocol", "0.0").toString());
+        
+        if (qilletniProtocol != 1.0) {
+            LOGGER.error("Got invalid qilletniProtocol: {}", qilletniProtocol);
+            return CompletableFuture.failedFuture(new ResponseErrorException(new ResponseError(ResponseErrorCode.InvalidParams, "Invalid qilletniProtocol", null)));
+        }
+
+        stopOnEntry = Boolean.parseBoolean(args.getOrDefault("stopOnEntry", "false").toString());
+        controller.setWeightEvents(Boolean.parseBoolean(args.getOrDefault("weightEvents", "false").toString()));
+        launched.complete(null);
+
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> attach(Map<String, Object> args) {
+        return IDebugProtocolServer.super.attach(args);
+    }
+
+    @Override
+    public CompletableFuture<Void> restart(RestartArguments args) {
+        return IDebugProtocolServer.super.restart(args);
+    }
+
+    @Override
+    public CompletableFuture<Void> disconnect(DisconnectArguments args) {
+        LOGGER.info("Debugger requested disconnect");
+        sessionEnded("disconnect requested");
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> terminate(TerminateArguments args) {
+        return IDebugProtocolServer.super.terminate(args);
+    }
+
+    @Override
+    public CompletableFuture<BreakpointLocationsResponse> breakpointLocations(BreakpointLocationsArguments args) {
+        return IDebugProtocolServer.super.breakpointLocations(args);
+    }
+
+    @Override
+    public CompletableFuture<SetBreakpointsResponse> setBreakpoints(SetBreakpointsArguments args) {
+        var source = args.getSource();
+        var requested = args.getBreakpoints() == null ? new SourceBreakpoint[0] : args.getBreakpoints();
+        var lines = Arrays.stream(requested).map(SourceBreakpoint::getLine).toList();
+
+        LOGGER.debug("setBreakpoints {} {}", source.getPath(), lines);
+
+        Breakpoint[] breakpoints;
+        if (source.getPath() == null) {
+            breakpoints = lines.stream().map(line -> {
+                var breakpoint = new Breakpoint();
+                breakpoint.setVerified(false);
+                breakpoint.setLine(line);
+                breakpoint.setMessage("Source has no path");
+                return breakpoint;
+            }).toArray(Breakpoint[]::new);
+        } else {
+            breakpoints = controller.setBreakpoints(normalizeSourcePath(source.getPath()), lines).stream()
+                    .map(result -> toBreakpoint(result, source))
+                    .toArray(Breakpoint[]::new);
+        }
+
+        var response = new SetBreakpointsResponse();
+        response.setBreakpoints(breakpoints);
+        return CompletableFuture.completedFuture(response);
+    }
+
+    /**
+     * Resolves symlinks in disk paths so they match {@link dev.qilletni.impl.debug.SourceId#path()}.
+     */
+    private static String normalizeSourcePath(String path) {
+        if (path.startsWith("qll://")) {
+            return path;
+        }
+
+        try {
+            return Path.of(path).toRealPath().toString();
+        } catch (IOException | InvalidPathException e) {
+            return path;
+        }
+    }
+
+    private static Breakpoint toBreakpoint(BreakpointResult result, Source source) {
+        var breakpoint = new Breakpoint();
+        breakpoint.setId(result.id());
+        breakpoint.setVerified(result.status() == BreakpointResult.Status.VERIFIED);
+        breakpoint.setLine(result.line());
+        breakpoint.setSource(source);
+
+        if (result.status() == BreakpointResult.Status.INVALID) {
+            breakpoint.setMessage(result.message());
+        }
+
+        return breakpoint;
+    }
+
+    @Override
+    public CompletableFuture<SetFunctionBreakpointsResponse> setFunctionBreakpoints(SetFunctionBreakpointsArguments args) {
+        return IDebugProtocolServer.super.setFunctionBreakpoints(args);
+    }
+
+    @Override
+    public CompletableFuture<SetExceptionBreakpointsResponse> setExceptionBreakpoints(SetExceptionBreakpointsArguments args) {
+        var filters = args.getFilters() == null ? List.<String>of() : Arrays.asList(args.getFilters());
+        controller.setStopOnUncaught(filters.contains(UNCAUGHT_FILTER));
+        controller.setStopOnSongPlayed(filters.contains(SONG_PLAYED_FILTER));
+        controller.setStopOnWeightSelected(filters.contains(WEIGHT_SELECTED_FILTER));
+        return CompletableFuture.completedFuture(new SetExceptionBreakpointsResponse());
+    }
+
+    @Override
+    public CompletableFuture<DataBreakpointInfoResponse> dataBreakpointInfo(DataBreakpointInfoArguments args) {
+        return IDebugProtocolServer.super.dataBreakpointInfo(args);
+    }
+
+    @Override
+    public CompletableFuture<SetDataBreakpointsResponse> setDataBreakpoints(SetDataBreakpointsArguments args) {
+        return IDebugProtocolServer.super.setDataBreakpoints(args);
+    }
+
+    @Override
+    public CompletableFuture<SetInstructionBreakpointsResponse> setInstructionBreakpoints(SetInstructionBreakpointsArguments args) {
+        return IDebugProtocolServer.super.setInstructionBreakpoints(args);
+    }
+
+    @Override
+    public CompletableFuture<ContinueResponse> continue_(ContinueArguments args) {
+        controller.resume(StepMode.NONE);
+
+        var response = new ContinueResponse();
+        response.setAllThreadsContinued(true);
+        return CompletableFuture.completedFuture(response);
+    }
+
+    @Override
+    public CompletableFuture<Void> next(NextArguments args) {
+        controller.resume(StepMode.NEXT);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> stepIn(StepInArguments args) {
+        controller.resume(StepMode.STEP_IN);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> stepOut(StepOutArguments args) {
+        controller.resume(StepMode.STEP_OUT);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> stepBack(StepBackArguments args) {
+        return IDebugProtocolServer.super.stepBack(args);
+    }
+
+    @Override
+    public CompletableFuture<Void> reverseContinue(ReverseContinueArguments args) {
+        return IDebugProtocolServer.super.reverseContinue(args);
+    }
+
+    @Override
+    public CompletableFuture<Void> restartFrame(RestartFrameArguments args) {
+        return IDebugProtocolServer.super.restartFrame(args);
+    }
+
+    @Override
+    public CompletableFuture<Void> goto_(GotoArguments args) {
+        return IDebugProtocolServer.super.goto_(args);
+    }
+
+    @Override
+    public CompletableFuture<Void> pause(PauseArguments args) {
+        controller.pause();
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<StackTraceResponse> stackTrace(StackTraceArguments args) {
+        return submit(view -> {
+            var frames = view.frames().stream().map(frame -> toStackFrame(view, frame)).toArray(StackFrame[]::new);
+
+            var response = new StackTraceResponse();
+            response.setStackFrames(frames);
+            response.setTotalFrames(frames.length);
+            return response;
+        });
+    }
+
+    private static StackFrame toStackFrame(StoppedView view, Frame frame) {
+        var stackFrame = new StackFrame();
+        stackFrame.setId(view.frameId(frame));
+        stackFrame.setName(frame.name());
+        stackFrame.setLine(frame.line());
+        stackFrame.setColumn(frame.column());
+
+        if (frame.kind() == Frame.Kind.NATIVE) {
+            stackFrame.setPresentationHint(StackFramePresentationHint.SUBTLE);
+        }
+
+        if (frame.source() != null) {
+            var source = new Source();
+            source.setPath(frame.source().path());
+            source.setName(frame.source().name());
+            stackFrame.setSource(source);
+        }
+
+        return stackFrame;
+    }
+
+    /**
+     * Runs {@code work} on the stopped interpreter thread, turning a failure into an error response with its message.
+     */
+    private <T> CompletableFuture<T> submit(Function<StoppedView, T> work) {
+        return controller.submit(work).exceptionallyCompose(e -> {
+            var cause = e instanceof CompletionException && e.getCause() != null ? e.getCause() : e;
+            return CompletableFuture.failedFuture(new ResponseErrorException(new ResponseError(ResponseErrorCode.InvalidRequest, cause.getMessage(), null)));
+        });
+    }
+
+    @Override
+    public CompletableFuture<ScopesResponse> scopes(ScopesArguments args) {
+        return submit(view -> {
+            var scopes = view.scopes(args.getFrameId()).stream().map(debugScope -> {
+                var scope = new Scope();
+                scope.setName(debugScope.name());
+                scope.setVariablesReference(debugScope.variablesReference());
+                scope.setExpensive(debugScope.kind() == DebugScope.Kind.GLOBALS);
+
+                if (debugScope.kind() == DebugScope.Kind.LOCALS) {
+                    scope.setPresentationHint(ScopePresentationHint.LOCALS);
+                }
+
+                return scope;
+            }).toArray(Scope[]::new);
+
+            var response = new ScopesResponse();
+            response.setScopes(scopes);
+            return response;
+        });
+    }
+
+    @Override
+    public CompletableFuture<VariablesResponse> variables(VariablesArguments args) {
+        var filter = args.getFilter() == null ? ChildFilter.ALL : switch (args.getFilter()) {
+            case INDEXED -> ChildFilter.INDEXED;
+            case NAMED -> ChildFilter.NAMED;
+        };
+        int start = args.getStart() == null ? 0 : args.getStart();
+        int count = args.getCount() == null ? 0 : args.getCount();
+
+        return submit(view -> {
+            var variables = view.variables(args.getVariablesReference(), filter, start, count).stream().map(debugVariable -> {
+                var variable = new Variable();
+                variable.setName(debugVariable.name());
+                variable.setValue(debugVariable.value());
+                variable.setType(debugVariable.type());
+                variable.setEvaluateName(debugVariable.evaluateName());
+                variable.setVariablesReference(debugVariable.variablesReference());
+
+                if (debugVariable.indexedVariables() > 0) {
+                    variable.setIndexedVariables(debugVariable.indexedVariables());
+                }
+
+                if (debugVariable.property()) {
+                    var hint = new VariablePresentationHint();
+                    hint.setKind(VariablePresentationHintKind.PROPERTY);
+                    variable.setPresentationHint(hint);
+                }
+
+                return variable;
+            }).toArray(Variable[]::new);
+
+            var response = new VariablesResponse();
+            response.setVariables(variables);
+            return response;
+        });
+    }
+
+    @Override
+    public CompletableFuture<SetVariableResponse> setVariable(SetVariableArguments args) {
+        return IDebugProtocolServer.super.setVariable(args);
+    }
+
+    @Override
+    public CompletableFuture<SourceResponse> source(SourceArguments args) {
+        return IDebugProtocolServer.super.source(args);
+    }
+
+    @Override
+    public CompletableFuture<ThreadsResponse> threads() {
+        var thread = new org.eclipse.lsp4j.debug.Thread();
+        thread.setId(THREAD_ID);
+        thread.setName("main");
+
+        var response = new ThreadsResponse();
+        response.setThreads(new org.eclipse.lsp4j.debug.Thread[]{thread});
+        return CompletableFuture.completedFuture(response);
+    }
+
+    @Override
+    public void stopped(String reason, List<Integer> hitBreakpointIds, String description, String text) {
+        var stopped = new StoppedEventArguments();
+        stopped.setReason(reason);
+        stopped.setThreadId(THREAD_ID);
+        stopped.setAllThreadsStopped(true);
+        stopped.setDescription(description);
+        stopped.setText(text);
+
+        if (!hitBreakpointIds.isEmpty()) {
+            stopped.setHitBreakpointIds(hitBreakpointIds.toArray(Integer[]::new));
+        }
+
+        try {
+            client.stopped(stopped);
+        } catch (RuntimeException e) {
+            LOGGER.debug("Unable to send stopped event, the debugger is already gone", e);
+        }
+    }
+
+    @Override
+    public CompletableFuture<WeightEntrySongsResponse> weightEntrySongs(WeightEntrySongsArguments args) {
+        try {
+            var indices = args.indices != null ? args.indices : List.<Integer>of();
+            return CompletableFuture.completedFuture(WeightEntrySongsResponse.of(controller.weightEntrySongs(args.weightsId, indices)));
+        } catch (IllegalArgumentException e) {
+            return CompletableFuture.failedFuture(new ResponseErrorException(new ResponseError(ResponseErrorCode.InvalidParams, e.getMessage(), null)));
+        }
+    }
+
+    @Override
+    public void weightPicked(WeightPick pick) {
+        try {
+            client.weightPicked(WeightPickedEventArguments.of(pick));
+        } catch (RuntimeException e) {
+            LOGGER.debug("Unable to send weight event, the debugger is already gone", e);
+        }
+    }
+
+    @Override
+    public void breakpointChanged(String sourcePath, BreakpointResult result) {
+        var source = new Source();
+        source.setPath(sourcePath);
+
+        var event = new BreakpointEventArguments();
+        event.setReason(BreakpointEventArgumentsReason.CHANGED);
+        event.setBreakpoint(toBreakpoint(result, source));
+
+        try {
+            client.breakpoint(event);
+        } catch (RuntimeException e) {
+            LOGGER.debug("Unable to send breakpoint event, the debugger is already gone", e);
+        }
+    }
+
+    @Override
+    public CompletableFuture<Void> terminateThreads(TerminateThreadsArguments args) {
+        return IDebugProtocolServer.super.terminateThreads(args);
+    }
+
+    @Override
+    public CompletableFuture<ModulesResponse> modules(ModulesArguments args) {
+        return IDebugProtocolServer.super.modules(args);
+    }
+
+    @Override
+    public CompletableFuture<LoadedSourcesResponse> loadedSources(LoadedSourcesArguments args) {
+        return IDebugProtocolServer.super.loadedSources(args);
+    }
+
+    @Override
+    public CompletableFuture<EvaluateResponse> evaluate(EvaluateArguments args) {
+        var mode = EvaluateArgumentsContext.REPL.equals(args.getContext()) ? EvalMode.REPL : EvalMode.WATCH;
+        int frameId = args.getFrameId() == null ? 0 : args.getFrameId();
+
+        return submit(view -> {
+            var result = view.evaluate(frameId, args.getExpression(), mode);
+
+            var response = new EvaluateResponse();
+            response.setResult(result.value());
+            response.setType(result.type());
+            response.setVariablesReference(result.variablesReference());
+
+            if (result.indexedVariables() > 0) {
+                response.setIndexedVariables(result.indexedVariables());
+            }
+
+            return response;
+        });
+    }
+
+    @Override
+    public CompletableFuture<SetExpressionResponse> setExpression(SetExpressionArguments args) {
+        return IDebugProtocolServer.super.setExpression(args);
+    }
+
+    @Override
+    public CompletableFuture<StepInTargetsResponse> stepInTargets(StepInTargetsArguments args) {
+        return IDebugProtocolServer.super.stepInTargets(args);
+    }
+
+    @Override
+    public CompletableFuture<GotoTargetsResponse> gotoTargets(GotoTargetsArguments args) {
+        return IDebugProtocolServer.super.gotoTargets(args);
+    }
+
+    @Override
+    public CompletableFuture<CompletionsResponse> completions(CompletionsArguments args) {
+        return IDebugProtocolServer.super.completions(args);
+    }
+
+    @Override
+    public CompletableFuture<ExceptionInfoResponse> exceptionInfo(ExceptionInfoArguments args) {
+        return IDebugProtocolServer.super.exceptionInfo(args);
+    }
+
+    @Override
+    public CompletableFuture<ReadMemoryResponse> readMemory(ReadMemoryArguments args) {
+        return IDebugProtocolServer.super.readMemory(args);
+    }
+
+    @Override
+    public CompletableFuture<WriteMemoryResponse> writeMemory(WriteMemoryArguments args) {
+        return IDebugProtocolServer.super.writeMemory(args);
+    }
+
+    @Override
+    public CompletableFuture<DisassembleResponse> disassemble(DisassembleArguments args) {
+        return IDebugProtocolServer.super.disassemble(args);
+    }
+
+    @Override
+    public CompletableFuture<LocationsResponse> locations(LocationsArguments args) {
+        return IDebugProtocolServer.super.locations(args);
+    }
+}

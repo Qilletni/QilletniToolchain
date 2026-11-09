@@ -68,3 +68,10 @@ jobs:
               --expected-component qilletni-toolchain \
               --expected-version "$VERSION"
           fi
+
+  # Informational: builds against same-named upstream branches via the composite build.
+  linked-build:
+    if: github.repository == 'Qilletni/QilletniToolchain'
+    uses: Qilletni/Qilletni/.github/workflows/reusable-linked-build.yml@master
+    with:
+      upstreams: Qilletni QilletniPackageUtility QilletniDocgen
