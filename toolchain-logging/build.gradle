@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'me.champeau.gradle.japicmp' version '0.4.6'
+    id 'org.gradlex.extra-java-module-info'
 }
 
 group = 'dev.qilletni.toolchain'
@@ -9,10 +10,27 @@ version = '1.0.0'
 sourceCompatibility = JavaVersion.VERSION_22
 targetCompatibility = JavaVersion.VERSION_22
 
+// This jar already has a real module-info, so mark its outgoing variants as
+// `javaModule=true`. Otherwise the root project's ExtraJavaModuleInfoTransform
+// runs on it while shadowJar resolves `runtimeClasspath` at task-graph time,
+// before the jar exists (fails on a fresh checkout / CI).
+extraJavaModuleInfo {
+    skipLocalJars.set(true)
+    // Same as the root project: leave non-module jars (e.g. OSGi annotations) untouched.
+    failOnMissingModuleInfo.set(false)
+}
+
 // See the root `build.gradle` for the rationale; regenerate together with
 // `./gradlew dependencies --write-locks` after a dependency change.
 dependencyLocking {
     lockAllConfigurations()
+}
+
+// On CI, always fetch the latest upstream -SNAPSHOT (no 24h changing-module cache).
+if (providers.environmentVariable('CI').isPresent()) {
+    configurations.configureEach {
+        resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+    }
 }
 
 // `mavenLocal()` is excluded from default release/CI dependency resolution - see

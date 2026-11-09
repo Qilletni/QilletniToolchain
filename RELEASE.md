@@ -133,6 +133,13 @@ The `Dependency Update` workflow refreshes both lockfiles automatically.
 Both flags are `false` by default. The release workflows and the `pr-ci.yml` workflow
 always set `-PincludeSiblingBuilds=false`.
 
+`checkNoSnapshotDependencies` stops only on a stable version. On a `-SNAPSHOT` version, it
+does nothing, so `master` can use a `-SNAPSHOT` version of an upstream component. Use
+`-PenforceReleaseDeps=true` to run the check on a `-SNAPSHOT` version.
+
+For a change that needs this repository and an upstream repository together, refer to
+[Change a component and its consumers together](https://github.com/Qilletni/Qilletni/blob/master/RELEASE.md#change-a-component-and-its-consumers-together).
+
 ## Links
 
 - [Qilletni release document][main]
