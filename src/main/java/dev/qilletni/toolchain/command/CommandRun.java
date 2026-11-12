@@ -168,8 +168,6 @@ public class CommandRun implements Callable<Integer> {
                                 return;
                             }
 
-                            qllJarExtractor.registerInnerJar(qllPath);
-
                             try {
                                 var loadedQll = qllLoader.loadQll(librarySourceFileResolver, qllPath);
 
@@ -177,6 +175,8 @@ public class CommandRun implements Callable<Integer> {
                                     LOGGER.debug("Skipping loading local library {} from dependencies", localLibraryName);
                                     return;
                                 }
+
+                                qllJarExtractor.registerInnerJar(qllPath);
 
                                 loadedLibraries.add(loadedQll);
                             } catch (IOException | URISyntaxException e) {
