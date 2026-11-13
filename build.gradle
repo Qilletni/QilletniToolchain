@@ -3,7 +3,7 @@ plugins {
     id 'java'
     id 'application'
     id 'maven-publish'
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'com.gradleup.shadow' version '8.3.11'
     id 'org.cyclonedx.bom' version '3.2.4'
     id 'org.gradlex.extra-java-module-info' version '1.14.2'
 }
@@ -20,6 +20,7 @@ application {
 
 // Let module-info require lsp4j modules
 extraJavaModuleInfo {
+    skipLocalJars.set(true)
     failOnMissingModuleInfo.set(false)
     automaticModule('org.eclipse.lsp4j:org.eclipse.lsp4j.debug', 'org.eclipse.lsp4j.debug')
     automaticModule('org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc', 'org.eclipse.lsp4j.jsonrpc')

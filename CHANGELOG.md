@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- DAP debugging
+
+### Fixed
+
+- CI building now use dependent repos' matching branches, if they exist
+
 ## [1.0.2] - 2026-09-30
 
 ### Added
