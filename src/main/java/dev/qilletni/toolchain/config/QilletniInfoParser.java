@@ -22,6 +22,8 @@ import java.util.Optional;
 
 public class QilletniInfoParser {
     
+    private static final Logger LOGGER = LoggerFactory.getLogger(QilletniInfoParser.class);
+    
     /**
      * Locates a qilletni_info.yml file directly in the given directory, and returns its path.
      * 
@@ -60,6 +62,8 @@ public class QilletniInfoParser {
         var version = Version.parseVersionString((String) Objects.requireNonNull(obj.get("version"), "'version' required in qilletni_info"))
                 .orElseThrow(() -> new InvalidVersionException("Invalid version"));
 
+        var qilletniVersion = parseQilletniVersion((String) obj.getOrDefault("qilletni", null));
+
         var sourceUrl = (String) obj.getOrDefault("source_url", "");
 
         var providerClass = (String) obj.getOrDefault("provider", null);
@@ -86,7 +90,7 @@ public class QilletniInfoParser {
 
         var nameScope = parsePackageName(nameString);
 
-        return new QilletniInfoData(nameScope.scope, nameScope.name, version, authorString, description, sourceUrl, providerClass, nativeBindFactoryClass, nativeClasses, autoImportFiles, dependencyList);
+        return new QilletniInfoData(nameScope.scope, nameScope.name, version, qilletniVersion, authorString, description, sourceUrl, providerClass, nativeBindFactoryClass, nativeClasses, autoImportFiles, dependencyList);
     }
 
     record PackageName(String scope, String name) {}
@@ -99,5 +103,14 @@ public class QilletniInfoParser {
         }
 
         return new PackageName(splitName[0], splitName[1]);
+    }
+    
+    private static ComparableVersion parseQilletniVersion(String qilletniVersion) {
+        if (qilletniVersion == null) {
+            return null;
+        }
+        
+        return ComparableVersion.parseComparableVersionString(qilletniVersion)
+                .orElseThrow(() -> new InvalidVersionException("Invalid qilletni version"));
     }
 }

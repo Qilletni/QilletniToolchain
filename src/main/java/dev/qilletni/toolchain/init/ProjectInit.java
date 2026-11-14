@@ -1,5 +1,7 @@
 package dev.qilletni.toolchain.init;
 
+import dev.qilletni.api.lib.qll.Version;
+import dev.qilletni.toolchain.VersionProvider;
 import dev.qilletni.toolchain.qll.QPMUtility;
 import dev.qilletni.toolchain.logging.ProgressDisplay;
 import org.slf4j.Logger;
@@ -29,6 +31,8 @@ public class ProjectInit {
         var qilletniSrc = sourcePath.resolve("qilletni-src");
         Files.createDirectories(qilletniSrc);
 
+        var qilletniCoreVersion = new VersionProvider().getQilletniCoreVersion();
+
         var scopedProjectName = projectName;
         if (scope != null) {
             scopedProjectName = "%s/%s".formatted(scope, projectName);
@@ -38,10 +42,11 @@ public class ProjectInit {
                 name: %s
                 version: 1.0.0
                 author: %s%s
+                qilletni: ^%s
                 dependencies:
                     qilletni/std: ^1.0.0
                 
-                """.formatted(scopedProjectName, authorName, nativeInit == null ? "" : "\n" + nativeInit.getNativeClassesList());
+                """.formatted(scopedProjectName, authorName, nativeInit == null ? "" : "\n" + nativeInit.getNativeClassesList(), qilletniCoreVersion.getVersionString());
         
         Files.writeString(qilletniSrc.resolve("qilletni_info.yml"), yml);
 

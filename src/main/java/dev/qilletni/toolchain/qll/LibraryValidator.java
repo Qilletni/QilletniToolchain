@@ -21,16 +21,16 @@ public class LibraryValidator {
         for (var library : libraries) {
             if (library.scope().equals(dependency.scope()) && library.name().equals(dependency.name())) {
                 if (dependency.version().permitsVersion(library.version())) {
-                    LOGGER.info("[{}] Dependency '{}' version {} matches required version {}", qllInfo.name(), dependency.name(), library.version(), dependency.version());
+                    LOGGER.info("[{}] Dependency '{}' version {} matches required version {}", qllInfo.name(), dependency.name(), library.version().getVersionString(), dependency.version().getVersionWithSpecifier());
                     return true;
                 }
                 
-                LOGGER.info("[{}] Dependency '{}' version {} does not match required version {}", qllInfo.name(), dependency.name(), library.version(), dependency.version());
+                LOGGER.info("[{}] Dependency '{}' version {} does not match required version {}", qllInfo.name(), dependency.name(), library.version().getVersionString(), dependency.version().getVersionWithSpecifier());
                 return false;
             }
         }
         
-        LOGGER.error("[{}] Dependency '{}' not found! (Version {})", qllInfo.name(), dependency.name(), dependency.version().getVersionString());
+        LOGGER.error("[{}] Dependency '{}' not found! (Version {})", qllInfo.name(), dependency.name(), dependency.version().getVersionWithSpecifier());
         return false;
     }
     

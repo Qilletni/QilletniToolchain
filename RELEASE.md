@@ -130,8 +130,11 @@ The `Dependency Update` workflow refreshes both lockfiles automatically.
   `../QilletniPackageUtility` and `../QilletniDocgen`.
 - `-PuseMavenLocal=true` builds against artifacts in the local Maven repository.
 
-Both flags are `false` by default. The release workflows and the `pr-ci.yml` workflow
-always set `-PincludeSiblingBuilds=false`.
+Both flags are `false` by default. The release workflows always set
+`-PincludeSiblingBuilds=false`. In `pr-ci.yml`, pull requests eligible for linking build
+against same-named upstream branches when any are found; otherwise they resolve
+dependencies from Maven and run the snapshot guard. The guard is skipped for linked
+builds.
 
 `checkNoSnapshotDependencies` stops only on a stable version. On a `-SNAPSHOT` version, it
 does nothing, so `master` can use a `-SNAPSHOT` version of an upstream component. Use
