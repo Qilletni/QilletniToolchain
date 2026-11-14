@@ -1,10 +1,13 @@
 package dev.qilletni.toolchain.qll;
 
 import dev.qilletni.api.lib.qll.QllInfo;
+import dev.qilletni.api.lib.qll.Version;
 import dev.qilletni.impl.lib.LibrarySourceFileResolver;
 import dev.qilletni.pkgutil.manifest.LockFile;
 import dev.qilletni.pkgutil.manifest.models.ResolvedPackage;
+import dev.qilletni.toolchain.VersionProvider;
 import dev.qilletni.toolchain.config.QilletniInfoParser;
+import dev.qilletni.toolchain.logging.ProgressDisplay;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,10 +17,7 @@ import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -25,8 +25,14 @@ import java.util.zip.ZipFile;
 public class QllLoader {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(QllLoader.class);
+    
+    private final VersionProvider versionProvider;
+    
+    public QllLoader() throws IOException {
+        this.versionProvider = new VersionProvider();
+    }
 
-    public QllInfo loadQll(LibrarySourceFileResolver librarySourceFileResolver, Path qllPath) throws IOException, URISyntaxException {
+    public Optional<QllInfo> loadQll(LibrarySourceFileResolver librarySourceFileResolver, Path qllPath) throws IOException, URISyntaxException {
         LOGGER.debug("Loading {}", qllPath);
 
         QllInfo qllInfo;
@@ -36,6 +42,10 @@ public class QllLoader {
         try (var zipFile = new ZipFile(qllPath.toFile());
              var zipFs = FileSystems.newFileSystem(zipUri, Collections.emptyMap())) {
             qllInfo = QllInfoGenerator.readPackagedQllInfo(zipFile.getInputStream(zipFile.getEntry("qll.info")));
+            
+            if (!validateQilletniVersion(qllInfo)) {
+                return Optional.empty();
+            }
 
             LOGGER.debug("qllInfo = {}", qllInfo);
 
@@ -100,7 +110,7 @@ public class QllLoader {
             librarySourceFileResolver.addLibraryResolver(qllInfo.name(), sourceMap::get);
         }
 
-        return qllInfo;
+        return Optional.of(qllInfo);
     }
 
     /**
@@ -111,12 +121,16 @@ public class QllLoader {
      * @param projectRootPath           The root path of the project (i.e. the parent of the <code>qilletni-src</code>)
      * @return The created {@link QllInfo}
      */
-    public QllInfo loadLocalLibrary(LibrarySourceFileResolver librarySourceFileResolver, Path projectRootPath) throws IOException {
+    public Optional<QllInfo> loadLocalLibrary(LibrarySourceFileResolver librarySourceFileResolver, Path projectRootPath) throws IOException {
         LOGGER.debug("Loading local {}", projectRootPath);
 
         var srcPath = projectRootPath.resolve("qilletni-src");
 
         var qllInfo = new QllInfo(QilletniInfoParser.readQilletniInfo(srcPath));
+        
+        if (!validateQilletniVersion(qllInfo)) {
+            return Optional.empty();
+        }
 
         // key: Qilletni file path,  value = actual file path
         var sourceMap = new HashMap<String, Path>();
@@ -150,11 +164,30 @@ public class QllLoader {
                     }
                 }));
 
-        return qllInfo;
+        return Optional.of(qllInfo);
     }
 
     public List<ResolvedPackage> getResolvedPackages(Path lockfilePath) throws IOException {
         var parse = LockFile.parse(lockfilePath);
         return new ArrayList<>(parse.getPackages().values());
+    }
+
+    /**
+     * Checks if the library's required Qilletni version matches Qilletni version being used.
+     * 
+     * @param qllInfo The QllInfo of the library being checked
+     * @return If the version is valid. If false, the library can not be loaded
+     */
+    private boolean validateQilletniVersion(QllInfo qllInfo) {
+        if (qllInfo.qilletniVersion() == null) {
+            return true;
+        }
+        
+        if (!qllInfo.qilletniVersion().permitsVersion(versionProvider.getQilletniCoreVersion())) {
+            ProgressDisplay.error("Qilletni version mismatch: %s@%s requires Qilletni version %s, but got %s", qllInfo.name(), qllInfo.version().getVersionString(), qllInfo.qilletniVersion().getVersionWithSpecifier(), versionProvider.getQilletniCoreVersion().getVersionString());
+            return false;
+        }
+
+        return true;
     }
 }

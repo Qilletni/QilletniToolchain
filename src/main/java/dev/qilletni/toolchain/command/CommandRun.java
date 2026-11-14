@@ -119,29 +119,34 @@ public class CommandRun implements Callable<Integer> {
 
         if (localLibrary != null) {
             LOGGER.info("Loading local library at {}", localLibrary);
-            localLibraryQll = qllLoader.loadLocalLibrary(librarySourceFileResolver, localLibrary);
-            loadedLibraries.add(localLibraryQll);
+            var localLibraryQllOptional = qllLoader.loadLocalLibrary(librarySourceFileResolver, localLibrary);
+            if (localLibraryQllOptional.isEmpty()) {
+                LOGGER.debug("Skipping loading of {}", localLibrary);
+            } else {
+                localLibraryQll = localLibraryQllOptional.get();
+                loadedLibraries.add(localLibraryQll);
 
-            if (useNativeJar) {
-                LOGGER.debug("Using native jar");
-                if (GradleProjectHelper.isGradleProject(localLibrary)) {
-                    var gradleProjectHelper = GradleProjectHelper.createProjectHelper(localLibrary).orElseThrow(() -> new RuntimeException("Unable to interact with Gradle project"));
-                    var gradleJarOptional = gradleProjectHelper.findProjectJar(false);
+                if (useNativeJar) {
+                    LOGGER.debug("Using native jar");
+                    if (GradleProjectHelper.isGradleProject(localLibrary)) {
+                        var gradleProjectHelper = GradleProjectHelper.createProjectHelper(localLibrary).orElseThrow(() -> new RuntimeException("Unable to interact with Gradle project"));
+                        var gradleJarOptional = gradleProjectHelper.findProjectJar(false);
 
-                    if (gradleJarOptional.isPresent()) {
-                        LOGGER.debug("Project jar will be extracted from: {}", gradleJarOptional);
+                        if (gradleJarOptional.isPresent()) {
+                            LOGGER.debug("Project jar will be extracted from: {}", gradleJarOptional);
 
-                        var gradleJar = gradleJarOptional.get();
+                            var gradleJar = gradleJarOptional.get();
 
-                        // Copy it if it's been created
-                        if (Files.exists(gradleJar)) {
-                            qllJarExtractor.addLocalLibraryJar(gradleJar);
+                            // Copy it if it's been created
+                            if (Files.exists(gradleJar)) {
+                                qllJarExtractor.addLocalLibraryJar(gradleJar);
+                            } else {
+                                LOGGER.error("Expected to find jar file {}, has it been built?", gradleJar);
+                            }
                         } else {
-                            LOGGER.error("Expected to find jar file {}, has it been built?", gradleJar);
+                            LOGGER.error("Unable to find jar output found in Gradle project");
+                            return 1;
                         }
-                    } else {
-                        LOGGER.error("Unable to find jar output found in Gradle project");
-                        return 1;
                     }
                 }
             }
@@ -169,7 +174,13 @@ public class CommandRun implements Callable<Integer> {
                             }
 
                             try {
-                                var loadedQll = qllLoader.loadQll(librarySourceFileResolver, qllPath);
+                                var loadedQllOptional = qllLoader.loadQll(librarySourceFileResolver, qllPath);
+                                if (loadedQllOptional.isEmpty()) {
+                                    LOGGER.debug("Skipping loading of {}", qllPath);
+                                    return;
+                                }
+                                
+                                var loadedQll = loadedQllOptional.get();
 
                                 if (loadedQll.name().equals(localLibraryName)) {
                                     LOGGER.debug("Skipping loading local library {} from dependencies", localLibraryName);

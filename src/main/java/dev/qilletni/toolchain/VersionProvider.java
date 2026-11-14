@@ -1,5 +1,6 @@
 package dev.qilletni.toolchain;
 
+import dev.qilletni.api.lib.qll.Version;
 import picocli.CommandLine.IVersionProvider;
 
 import java.io.IOException;
@@ -16,18 +17,22 @@ import java.util.Properties;
 public class VersionProvider implements IVersionProvider {
 
     private static final String RESOURCE_PATH = "/dev/qilletni/toolchain/version.properties";
+    
+    private final Properties versionProperties;
+
+    public VersionProvider() throws IOException {
+        this.versionProperties = loadProperties();
+    }
 
     @Override
     public String[] getVersion() throws IOException {
-        var properties = loadProperties();
-
         return new String[]{
-                "qilletni " + properties.getProperty("toolchain.version", "unknown"),
-                "  qilletni-core:    " + properties.getProperty("qilletni.core.version", "unknown"),
-                "  qilletni-api:     " + properties.getProperty("qilletni.api.version", "unknown"),
-                "  qilletni-pkgutil: " + properties.getProperty("qilletni.pkgutil.version", "unknown"),
-                "  qilletni-docgen:  " + properties.getProperty("qilletni.docgen.version", "unknown"),
-                "  commit:           " + properties.getProperty("commit", "unknown"),
+                "qilletni " + versionProperties.getProperty("toolchain.version", "unknown"),
+                "  qilletni-core:    " + versionProperties.getProperty("qilletni.core.version", "unknown"),
+                "  qilletni-api:     " + versionProperties.getProperty("qilletni.api.version", "unknown"),
+                "  qilletni-pkgutil: " + versionProperties.getProperty("qilletni.pkgutil.version", "unknown"),
+                "  qilletni-docgen:  " + versionProperties.getProperty("qilletni.docgen.version", "unknown"),
+                "  commit:           " + versionProperties.getProperty("commit", "unknown"),
         };
     }
 
@@ -45,5 +50,34 @@ public class VersionProvider implements IVersionProvider {
         }
 
         return properties;
+    }
+
+    public Version getToolchainVersion() {
+        return Version.parseVersionString(versionProperties.getProperty("toolchain.version", "unknown"))
+                .orElseThrow(() -> new IllegalStateException("Failed to parse toolchain.version"));
+    }
+
+    public Version getQilletniCoreVersion() {
+        return Version.parseVersionString(versionProperties.getProperty("qilletni.core.version", "unknown"))
+                .orElseThrow(() -> new IllegalStateException("Failed to parse qilletni.core.version"));
+    }
+
+    public Version getQilletniAPIVersion() {
+        return Version.parseVersionString(versionProperties.getProperty("qilletni.api.version", "unknown"))
+                .orElseThrow(() -> new IllegalStateException("Failed to parse qilletni.api.version"));
+    }
+
+    public Version getQilletniPkgUtilVersion() {
+        return Version.parseVersionString(versionProperties.getProperty("qilletni.pkgutil.version", "unknown"))
+                .orElseThrow(() -> new IllegalStateException("Failed to parse qilletni.pkgutil.version"));
+    }
+
+    public Version getQilletniDocgenVersion() {
+        return Version.parseVersionString(versionProperties.getProperty("qilletni.docgen.version", "unknown"))
+                .orElseThrow(() -> new IllegalStateException("Failed to parse qilletni.docgen.version"));
+    }
+
+    public String getCommit() {
+        return versionProperties.getProperty("commit", "unknown");
     }
 }
