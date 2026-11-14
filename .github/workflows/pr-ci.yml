@@ -20,6 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - id: link
+        uses: Qilletni/Qilletni/.github/actions/link-upstreams@master
+        with:
+          upstreams: Qilletni QilletniPackageUtility QilletniDocgen
+
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
@@ -29,10 +34,11 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
-      - name: Build and test (sibling composite builds explicitly disabled)
-        run: ./gradlew clean build -PincludeSiblingBuilds=false
+      - name: Build and test
+        run: ./gradlew clean build -PincludeSiblingBuilds=${{ steps.link.outputs.found }}
 
       - name: Ensure the resolved dependency graph has no SNAPSHOT/dynamic dependencies
+        if: steps.link.outputs.found != 'true'
         run: ./gradlew checkNoSnapshotDependencies -PincludeSiblingBuilds=false
 
       - uses: actions/checkout@v7
@@ -68,10 +74,3 @@ jobs:
               --expected-component qilletni-toolchain \
               --expected-version "$VERSION"
           fi
-
-  # Informational: builds against same-named upstream branches via the composite build.
-  linked-build:
-    if: github.repository == 'Qilletni/QilletniToolchain'
-    uses: Qilletni/Qilletni/.github/workflows/reusable-linked-build.yml@master
-    with:
-      upstreams: Qilletni QilletniPackageUtility QilletniDocgen
