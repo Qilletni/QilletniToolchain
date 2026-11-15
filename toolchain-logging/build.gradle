@@ -7,8 +7,23 @@ plugins {
 group = 'dev.qilletni.toolchain'
 version = '1.0.0'
 
-sourceCompatibility = JavaVersion.VERSION_22
-targetCompatibility = JavaVersion.VERSION_22
+java {
+    sourceCompatibility = JavaVersion.VERSION_27
+    targetCompatibility = JavaVersion.VERSION_27
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(27)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 27
+}
+
+tasks.withType(Test).configureEach {
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(27)
+    }
+}
 
 // This jar already has a real module-info, so mark its outgoing variants as
 // `javaModule=true`. Otherwise the root project's ExtraJavaModuleInfoTransform
@@ -51,14 +66,14 @@ repositories {
 
 dependencies {
     // Log4j2 core for the plugin system
-    implementation 'org.apache.logging.log4j:log4j-api:2.25.1'
-    implementation 'org.apache.logging.log4j:log4j-core:2.25.3'
-    annotationProcessor 'org.apache.logging.log4j:log4j-core:2.25.3'
+    implementation 'org.apache.logging.log4j:log4j-api:2.26.1'
+    implementation 'org.apache.logging.log4j:log4j-core:2.26.1'
+    annotationProcessor 'org.apache.logging.log4j:log4j-core:2.26.1'
 
     implementation "dev.qilletni.api:qilletni-api:${qilletniCoreVersion}"
 
-    implementation 'org.slf4j:slf4j-api:2.0.16'
-    implementation 'info.picocli:picocli:4.7.5'
+    implementation 'org.slf4j:slf4j-api:2.0.20'
+    implementation 'info.picocli:picocli:4.7.7'
 }
 
 compileJava {

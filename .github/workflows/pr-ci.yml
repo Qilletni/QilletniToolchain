@@ -28,9 +28,8 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
-          java-version: '22'
+          java-version: '27'
           distribution: 'temurin'
-          cache: 'gradle'
 
       - uses: gradle/actions/setup-gradle@v5
 
@@ -73,4 +72,7 @@ jobs:
               --marker "$GITHUB_WORKSPACE/release/pending-release.json" \
               --expected-component qilletni-toolchain \
               --expected-version "$VERSION"
-          fi
+            fi
+
+      - name: Verify the shaded CLI launches on Java 27
+        run: java -jar build/libs/QilletniToolchain.jar --version

@@ -32,7 +32,7 @@ if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
 elif command -v java > /dev/null 2>&1; then
   JAVA=java
 else
-  echo "qilletni: no Java runtime found. Qilletni needs Java 22 or newer;" >&2
+  echo "qilletni: no Java runtime found. Qilletni needs Java 27 or newer;" >&2
   echo "install a JDK (https://adoptium.net) or set JAVA_HOME." >&2
   exit 1
 fi
