@@ -31,7 +31,8 @@ public class ProjectInit {
         var qilletniSrc = sourcePath.resolve("qilletni-src");
         Files.createDirectories(qilletniSrc);
 
-        var qilletniCoreVersion = new VersionProvider().getQilletniCoreVersion();
+        var versionProvider = new VersionProvider();
+        var qilletniCoreVersion = versionProvider.getQilletniCoreVersion();
 
         var scopedProjectName = projectName;
         if (scope != null) {
@@ -74,7 +75,7 @@ public class ProjectInit {
         
         if (nativeInit != null) {
             ProgressDisplay.info("Creating Gradle project...");
-            var gradleProjectInitializer = new GradleProjectInitializer(sourcePath, sourcePath.getFileName().toString(), nativeInit.packageName, nativeInit.className, GRADLE_VERSION);
+            var gradleProjectInitializer = new GradleProjectInitializer(sourcePath, sourcePath.getFileName().toString(), nativeInit.packageName, nativeInit.className, versionProvider, GRADLE_VERSION);
             gradleProjectInitializer.initializeProject();
         }
 

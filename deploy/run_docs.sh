@@ -7,7 +7,7 @@
 #   - The relative path to the "qilletni-src" directory in that repo.
 #
 # It then clones the repository into /tmp/<library>-repo and, finally, runs a Docker container
-# (using OpenJDK 22) that executes:
+# (using Eclipse Temurin 27) that executes:
 #
 #    java -jar /tmp/app.jar <clone_path>/<qilletni-src>
 #
@@ -92,18 +92,18 @@ if docker ps -q --filter "name=${CONTAINER_NAME}" | grep -q .; then
   docker rm "${CONTAINER_NAME}"
 fi
 
-echo "Pulling OpenJDK 22 image..."
-docker pull openjdk:22
+echo "Pulling Eclipse Temurin 27 image..."
+docker pull eclipse-temurin:27-jre
 
 echo "Starting Docker container ${CONTAINER_NAME}..."
 docker run --rm --name "${CONTAINER_NAME}" \
   -v "${SERVE_PATH}":"${SERVE_PATH}":rw \
   -v "${CACHE_PATH}":"${CACHE_PATH}":rw \
   -v "/tmp":"/tmp":rw \
-  openjdk:22 \
+  eclipse-temurin:27-jre \
   bash -c "\
     set -euo pipefail; \
-    echo 'Running application with Java 22...'; \
+    echo 'Running application with Java 27...'; \
     java -jar ${TOOLCHAIN_JAR} doc -o ${SERVE_PATH} -c ${CACHE_PATH} ${FINAL_PARAM} \
   "
 

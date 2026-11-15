@@ -1,5 +1,6 @@
 package dev.qilletni.toolchain.init;
 
+import dev.qilletni.toolchain.VersionProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,14 +22,16 @@ public class GradleProjectInitializer {
     private final String projectName;
     private final String packageName;
     private final String className;
+    private final VersionProvider versionProvider;
     private final String gradleVersion;
     private final String tagVersion;
 
-    public GradleProjectInitializer(Path projectDir, String projectName, String packageName, String className, String gradleVersion) {
+    public GradleProjectInitializer(Path projectDir, String projectName, String packageName, String className, VersionProvider versionProvider, String gradleVersion) {
         this.projectDir = projectDir;
         this.projectName = projectName;
         this.packageName = packageName;
         this.className = className;
+        this.versionProvider = versionProvider;
         this.gradleVersion = gradleVersion;
 
         var tagVersion = gradleVersion;
@@ -77,8 +80,17 @@ public class GradleProjectInitializer {
             group = '%s'
             version = '1.0.0'
 
-            sourceCompatibility = JavaVersion.VERSION_22
-            targetCompatibility = JavaVersion.VERSION_22
+            java {
+                sourceCompatibility = JavaVersion.VERSION_27
+                targetCompatibility = JavaVersion.VERSION_27
+                toolchain {
+                    languageVersion = JavaLanguageVersion.of(27)
+                }
+            }
+
+            tasks.withType(JavaCompile).configureEach {
+                options.release = 27
+            }
 
             repositories {
                 mavenLocal()
@@ -89,7 +101,7 @@ public class GradleProjectInitializer {
                 testImplementation platform('org.junit:junit-bom:5.9.1')
                 testImplementation 'org.junit.jupiter:junit-jupiter'
 
-                compileOnly 'dev.qilletni.api:qilletni-api:1.0.0-SNAPSHOT'
+                compileOnly 'dev.qilletni.api:qilletni-api:%s'
             }
 
             shadowJar {
@@ -100,7 +112,7 @@ public class GradleProjectInitializer {
             test {
                 useJUnitPlatform()
             }
-            """.formatted(packageName);
+            """.formatted(packageName, versionProvider.getQilletniAPIVersion().getVersionString());
 
         var filePath = projectDir.resolve("build.gradle");
         Files.writeString(filePath, content);
